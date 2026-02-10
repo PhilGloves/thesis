@@ -479,7 +479,7 @@ namespace ViewSupport
                 else
                 {
                     // Draw Edge as vector Line
-                    options.Graphics.DrawLine(pPen, startPoint, endPoint);
+                        options.Graphics.DrawLine(pPen, startPoint, endPoint);
                 }
 
                 shapes.Add(

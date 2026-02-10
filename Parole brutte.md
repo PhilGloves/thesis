@@ -32,7 +32,7 @@ L’obiettivo non è sviluppare un sistema di fabbricazione completo da zero, ma
 Capitolo: Analisi degli strumenti esistenti
 Sottoparagrafo: HoloZens
 
-Test preliminare HoloZens — Setup ambiente
+### Test preliminare HoloZens — Setup ambiente
 
 Durante la fase iniziale del progetto è stato individuato il software HoloZens come possibile strumento di riferimento per la generazione e simulazione di strutture basate su scratch hologram. Il software è stato individuato tramite ricerca su repository pubblici, in particolare sulla piattaforma GitHub, dove è disponibile sotto forma di codice sorgente.
 
@@ -41,6 +41,39 @@ Dalla documentazione disponibile, HoloZens appare come un software sperimentale 
 Il software è sviluppato in linguaggio C# e non è distribuito come applicazione già compilata. L’autore indica esplicitamente la necessità di clonare il repository, compilare il progetto utilizzando Visual Studio e successivamente eseguire il programma su sistema operativo Windows.
 
 Per questo motivo, l’utilizzo del software richiede la configurazione di un ambiente di sviluppo compatibile con applicazioni .NET, in particolare Microsoft Visual Studio con i componenti necessari per lo sviluppo desktop. Questo aspetto evidenzia come molti strumenti sperimentali in ambito computer graphics e fabbricazione digitale siano disponibili principalmente come codice sorgente, rendendo necessaria la conoscenza delle procedure di compilazione e build del software.
+
+
+### Analisi sperimentale preliminare della robustezza rispetto alla complessità della mesh
+
+Durante la fase iniziale di sperimentazione è stato analizzato il comportamento del software HoloZens rispetto a modelli tridimensionali con diversa complessità geometrica.
+
+In una prima fase sono stati utilizzati modelli estremamente semplici generati proceduralmente tramite Blender, come ad esempio un cubo esportato in formato STL. In questo caso il software ha mostrato un comportamento stabile, consentendo la visualizzazione corretta del modello e l’interazione tramite operazioni di zoom e pan senza evidenziare anomalie o crash.
+
+Successivamente sono stati testati modelli geometricamente più complessi, come ad esempio un nodo toroidale (torus knot). In questo caso il software ha mostrato alcune anomalie nella visualizzazione del modello e, dopo ripetute operazioni di zoom e navigazione, ha generato un crash dell’applicazione.
+
+Questo comportamento suggerisce che la stabilità del software sia fortemente influenzata dalla complessità topologica della mesh e dalla qualità della discretizzazione triangolare del modello STL. In particolare, mesh con geometrie più complesse possono contenere triangoli molto piccoli, normali numericamente instabili o configurazioni degeneri che possono portare a instabilità numeriche durante il calcolo delle proprietà geometriche utilizzate dal software.
+
+L’output del software è stato esportato in formato SVG, contenente le traiettorie vettoriali corrispondenti ai percorsi di incisione. Tali file sono stati analizzati tramite software di visualizzazione vettoriale e strumenti di modellazione 3D per verificare la struttura e la distribuzione delle traiettorie generate.
+
+Durante le fasi di test il software ha mostrato la capacità di generare famiglie di traiettorie continue e coerenti con la geometria della superficie del modello. Variando i parametri di risoluzione e angolo di vista è stato possibile osservare variazioni prevedibili nella densità e nella disposizione delle curve generate, indicando un comportamento stabile del sistema di campionamento geometrico.
+
+I tentativi di riprodurre risultati precedentemente dimostrati utilizzando fonti di progetto disponibili al pubblico non hanno prodotto risultati identici, il che suggerisce potenziali discrepanze tra le versioni del codice sorgente distribuito e le build dimostrative, oppure la sensibilità della pipeline a piccole variazioni nella struttura della mesh di input.
+
+
+
+NOTES
+Tried copying and pasting a knot image on chatgpt asking to give me a .stl file but it produced an horrendous big file which couldn't be opened from the program itself becasue maybe too large (it crashed every time I tried to open it, and my pc is not that bad lol)
+
+On here:
+https://www.printables.com/model/444295-trefoil-knot/files
+I found this cool knot file which is very small in terms of dimensions
+
+
+Now I've downloaded a thorus and tried with a cube but it seems like there are some problems:
+Hard to manipulate the object and to learn how to use the program
+
+
+
 
 
 
