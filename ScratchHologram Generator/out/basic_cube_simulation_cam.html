@@ -26,20 +26,24 @@
       <strong id="camPitchValue">0 deg</strong>
       <label>Zoom: <input id="camZoom" type="range" min="60" max="220" step="1" value="100"/></label>
       <strong id="camZoomValue">100%</strong>
-      <label>View gain: <input id="viewGain" type="range" min="100" max="600" step="10" value="280"/></label>
-      <strong id="viewGainValue">2.8x</strong>
+      <label>View gain: <input id="viewGain" type="range" min="10" max="300" step="5" value="100"/></label>
+      <strong id="viewGainValue">1.0x</strong>
       <label>Arc stride: <input id="arcStride" type="range" min="1" max="12" step="1" value="4"/></label>
       <strong id="arcStrideValue">4</strong>
       <label>Arc limit: <input id="arcLimit" type="range" min="200" max="10000" step="100" value="2500"/></label>
       <strong id="arcLimitValue">2500</strong>
       <label>Arc min r: <input id="arcMinR" type="range" min="0" max="20" step="1" value="1"/></label>
       <strong id="arcMinRValue">1</strong>
+      <label>Depth: <input id="depthMix" type="range" min="5" max="100" step="1" value="70"/></label>
+      <strong id="depthMixValue">70%</strong>
+      <label>Thresh: <input id="thresh" type="range" min="0" max="90" step="1" value="10"/></label>
+      <strong id="threshValue">10%</strong>
       <label>Arc alpha: <input id="arcAlpha" type="range" min="2" max="80" step="1" value="20"/></label>
       <strong id="arcAlphaValue">20%</strong>
       <label><input id="showArcs" type="checkbox" checked/> Show arcs</label>
       <label><input id="showWire" type="checkbox" checked/> Show simulated profile</label>
     </div>
-    <div class="small">Camera orbit is 3D-projected. Increase View gain if angle motion feels too subtle.</div>
+    <div class="small">Camera orbit is 3D-projected. Depth sort is enabled for arcs (far to near).</div>
     <div class="panel">
       <canvas id="sim" width="246" height="247"></canvas>
     </div>
@@ -64,6 +68,10 @@
     const arcLimitValue = document.getElementById('arcLimitValue');
     const arcMinR = document.getElementById('arcMinR');
     const arcMinRValue = document.getElementById('arcMinRValue');
+    const depthMix = document.getElementById('depthMix');
+    const depthMixValue = document.getElementById('depthMixValue');
+    const thresh = document.getElementById('thresh');
+    const threshValue = document.getElementById('threshValue');
     const arcAlpha = document.getElementById('arcAlpha');
     const arcAlphaValue = document.getElementById('arcAlphaValue');
     const showArcs = document.getElementById('showArcs');
@@ -121,7 +129,7 @@
       if (!Number.isFinite(w) || Math.abs(w) < 1e-9) return null;
       const vx = (v1 / w) * m.scale + m.tx;
       const vy = -((v2 / w) * m.scale) + m.ty;
-      const vz = v3 / w;
+      const vz = (v3 / w) * m.scale;
       if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return null;
       return [vx, vy, vz];
     }
@@ -145,6 +153,8 @@
       arcStrideValue.textContent = `${Number(arcStride.value).toFixed(0)}`;
       arcLimitValue.textContent = `${Number(arcLimit.value).toFixed(0)}`;
       arcMinRValue.textContent = `${Number(arcMinR.value).toFixed(0)}`;
+      depthMixValue.textContent = `${Number(depthMix.value).toFixed(0)}%`;
+      threshValue.textContent = `${Number(thresh.value).toFixed(0)}%`;
       arcAlphaValue.textContent = `${Number(arcAlpha.value).toFixed(0)}%`;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const cam = buildCameraState();
@@ -172,11 +182,13 @@
         const stride = Math.max(1, Number(arcStride.value));
         const limit = Math.max(100, Number(arcLimit.value));
         const minR = Math.max(0, Number(arcMinR.value));
-        const alpha = Math.max(0.01, Number(arcAlpha.value) / 100.0);
-        ctx.strokeStyle = `rgba(190,190,190,${alpha.toFixed(3)})`;
+        const baseAlpha = Math.max(0.01, Number(arcAlpha.value) / 100.0);
+        const depthKeep = Math.max(0.05, Number(depthMix.value) / 100.0);
+        const threshold = Math.max(0.0, Math.min(0.95, Number(thresh.value) / 100.0));
         ctx.lineWidth = 0.9;
-        let drawn = 0;
-        edgeLoop: for (const e of data.edges) {
+        const sampleCap = Math.max(10000, limit * 20);
+        const candidates = [];
+        collectLoop: for (const e of data.edges) {
           const p0 = proj[e[0]];
           const p1 = proj[e[1]];
           if (!p0 || !p1) continue;
@@ -192,11 +204,30 @@
             const cx = px + tx;
             const cy = (py - dist / 2.0) + ty;
             const start = (dist > 0) ? 0 : Math.PI;
+            candidates.push({ z: pz, cx, cy, r, start });
+            if (candidates.length >= sampleCap) break collectLoop;
+          }
+        }
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => a.z - b.z);
+          const zMin = candidates[0].z;
+          const zMax = candidates[candidates.length - 1].z;
+          const zSpan = Math.max(1e-9, zMax - zMin);
+          const depthGate = 1.0 - depthKeep;
+          const depthDen = Math.max(1e-9, depthKeep);
+          let drawn = 0;
+          for (const c of candidates) {
+            const depthNorm = (c.z - zMin) / zSpan;
+            if (depthNorm < depthGate) continue;
+            const gated = (depthNorm - depthGate) / depthDen;
+            if (gated < threshold) continue;
+            const a = Math.max(0.01, Math.min(1.0, baseAlpha * (0.15 + 0.85 * gated)));
+            ctx.strokeStyle = `rgba(190,190,190,${a.toFixed(3)})`;
             ctx.beginPath();
-            ctx.arc(cx, cy, r, start, start + Math.PI, false);
+            ctx.arc(c.cx, c.cy, c.r, c.start, c.start + Math.PI, false);
             ctx.stroke();
             drawn += 1;
-            if (drawn >= limit) break edgeLoop;
+            if (drawn >= limit) break;
           }
         }
       }
@@ -224,6 +255,8 @@
     arcStride.addEventListener('input', draw);
     arcLimit.addEventListener('input', draw);
     arcMinR.addEventListener('input', draw);
+    depthMix.addEventListener('input', draw);
+    thresh.addEventListener('input', draw);
     arcAlpha.addEventListener('input', draw);
     showArcs.addEventListener('change', draw);
     showWire.addEventListener('change', draw);
