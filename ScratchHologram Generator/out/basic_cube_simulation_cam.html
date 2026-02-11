@@ -26,8 +26,8 @@
       <strong id="camPitchValue">0 deg</strong>
       <label>Zoom: <input id="camZoom" type="range" min="60" max="220" step="1" value="100"/></label>
       <strong id="camZoomValue">100%</strong>
-      <label>View gain: <input id="viewGain" type="range" min="10" max="300" step="5" value="100"/></label>
-      <strong id="viewGainValue">1.0x</strong>
+      <label>View gain: <input id="viewGain" type="range" min="100" max="600" step="10" value="280"/></label>
+      <strong id="viewGainValue">2.8x</strong>
       <label>Arc stride: <input id="arcStride" type="range" min="1" max="12" step="1" value="4"/></label>
       <strong id="arcStrideValue">4</strong>
       <label>Arc limit: <input id="arcLimit" type="range" min="200" max="10000" step="100" value="2500"/></label>
@@ -121,7 +121,7 @@
       if (!Number.isFinite(w) || Math.abs(w) < 1e-9) return null;
       const vx = (v1 / w) * m.scale + m.tx;
       const vy = -((v2 / w) * m.scale) + m.ty;
-      const vz = (v3 / w) * m.scale;
+      const vz = v3 / w;
       if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return null;
       return [vx, vy, vz];
     }

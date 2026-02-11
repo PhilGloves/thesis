@@ -361,42 +361,19 @@ def generate_arcs(
     return arcs
 
 
-def build_simulation_paths(
+def build_simulation_edge_info(
     model_vertices: np.ndarray,
-    zero_vertices: np.ndarray,
     edges: list[Edge],
     view_points_per_unit_length: float,
-    n_view: float,
-    min_arc_radius: float,
-) -> list[list[tuple[float, float, float]]]:
-    paths: list[list[tuple[float, float, float]]] = []
-
+) -> list[tuple[int, int, int]]:
+    sim_edges: list[tuple[int, int, int]] = []
     for edge in edges:
-        model_start = model_vertices[edge.start_idx]
-        model_end = model_vertices[edge.end_idx]
-        zero_start = zero_vertices[edge.start_idx]
-        zero_end = zero_vertices[edge.end_idx]
-
-        points = get_edge_points(
-            model_start=model_start,
-            model_end=model_end,
-            zero_start=zero_start,
-            zero_end=zero_end,
-            view_points_per_unit_length=view_points_per_unit_length,
-        )
-
-        path: list[tuple[float, float, float]] = []
-        for point in points:
-            _, _, rect_w, _ = get_arc_square(point, n_view)
-            radius = rect_w / 2.0
-            if radius < min_arc_radius:
-                continue
-            path.append((float(point[0]), float(point[1]), float(point[2])))
-
-        if len(path) >= 2:
-            paths.append(path)
-
-    return paths
+        start = model_vertices[edge.start_idx]
+        end = model_vertices[edge.end_idx]
+        edge_len = float(np.linalg.norm(end - start))
+        num_points = max(2, int(view_points_per_unit_length * edge_len))
+        sim_edges.append((int(edge.start_idx), int(edge.end_idx), int(num_points)))
+    return sim_edges
 
 
 def compute_sim_bounds_from_arcs(arcs: list[Arc]) -> tuple[float, float, float, float]:
@@ -412,9 +389,11 @@ def compute_sim_bounds_from_arcs(arcs: list[Arc]) -> tuple[float, float, float, 
 
 def write_simulation_html(
     html_path: Path,
-    paths: list[list[tuple[float, float, float]]],
+    model_vertices: np.ndarray,
+    sim_edges: list[tuple[int, int, int]],
+    camera: CameraConfig,
     arcs: list[Arc],
-    n_view: float,
+    min_arc_radius: float,
 ) -> None:
     html_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -427,17 +406,21 @@ def write_simulation_html(
     offset_y = padding - min_y
 
     payload = {
-        "nView": float(n_view),
-        "offsetX": float(offset_x),
-        "offsetY": float(offset_y),
-        "paths": [
-            [[round(p[0], 3), round(p[1], 3), round(p[2], 3)] for p in path]
-            for path in paths
+        "minArcRadius": float(min_arc_radius),
+        "camera": {
+            "po": [float(camera.po[0]), float(camera.po[1]), float(camera.po[2])],
+            "pr": [float(camera.pr[0]), float(camera.pr[1]), float(camera.pr[2])],
+            "lookUp": [float(camera.look_up[0]), float(camera.look_up[1]), float(camera.look_up[2])],
+            "currentScale": float(camera.current_scale),
+            "zf": float(camera.zf),
+            "canvasWidth": int(camera.canvas_width),
+            "canvasHeight": int(camera.canvas_height),
+        },
+        "vertices": [
+            [round(float(v[0]), 4), round(float(v[1]), 4), round(float(v[2]), 4)]
+            for v in model_vertices
         ],
-        "arcs": [
-            [a.rect_x, a.rect_y, a.rect_w, a.rect_h, int(a.start_angle)]
-            for a in arcs
-        ],
+        "edges": [[e[0], e[1], e[2]] for e in sim_edges],
     }
     payload_json = json.dumps(payload, separators=(",", ":"))
 
@@ -455,17 +438,35 @@ def write_simulation_html(
         "    .toolbar label { font-size: 14px; }\n"
         "    .panel { background: #20222a; border: 1px solid #2d313a; border-radius: 8px; padding: 10px; }\n"
         "    canvas { background: #0f1014; display: block; border-radius: 6px; width: 100%; height: auto; }\n"
-        "    input[type=range] { width: 280px; }\n"
+        "    input[type=range] { width: 190px; }\n"
+        "    .small { opacity: 0.8; font-size: 12px; margin: 6px 2px 10px; }\n"
         "  </style>\n"
         "</head>\n"
         "<body>\n"
         "  <div class=\"wrap\">\n"
         "    <div class=\"toolbar panel\">\n"
         "      <label>View angle: <input id=\"angle\" type=\"range\" min=\"-90\" max=\"90\" step=\"1\" value=\"0\"/></label>\n"
-        "      <strong id=\"angleValue\">0°</strong>\n"
+        "      <strong id=\"angleValue\">0 deg</strong>\n"
+        "      <label>Cam yaw: <input id=\"camYaw\" type=\"range\" min=\"-45\" max=\"45\" step=\"1\" value=\"0\"/></label>\n"
+        "      <strong id=\"camYawValue\">0 deg</strong>\n"
+        "      <label>Cam pitch: <input id=\"camPitch\" type=\"range\" min=\"-45\" max=\"45\" step=\"1\" value=\"0\"/></label>\n"
+        "      <strong id=\"camPitchValue\">0 deg</strong>\n"
+        "      <label>Zoom: <input id=\"camZoom\" type=\"range\" min=\"60\" max=\"220\" step=\"1\" value=\"100\"/></label>\n"
+        "      <strong id=\"camZoomValue\">100%</strong>\n"
+        "      <label>View gain: <input id=\"viewGain\" type=\"range\" min=\"10\" max=\"300\" step=\"5\" value=\"100\"/></label>\n"
+        "      <strong id=\"viewGainValue\">1.0x</strong>\n"
+        "      <label>Arc stride: <input id=\"arcStride\" type=\"range\" min=\"1\" max=\"12\" step=\"1\" value=\"4\"/></label>\n"
+        "      <strong id=\"arcStrideValue\">4</strong>\n"
+        "      <label>Arc limit: <input id=\"arcLimit\" type=\"range\" min=\"200\" max=\"10000\" step=\"100\" value=\"2500\"/></label>\n"
+        "      <strong id=\"arcLimitValue\">2500</strong>\n"
+        "      <label>Arc min r: <input id=\"arcMinR\" type=\"range\" min=\"0\" max=\"20\" step=\"1\" value=\"1\"/></label>\n"
+        "      <strong id=\"arcMinRValue\">1</strong>\n"
+        "      <label>Arc alpha: <input id=\"arcAlpha\" type=\"range\" min=\"2\" max=\"80\" step=\"1\" value=\"20\"/></label>\n"
+        "      <strong id=\"arcAlphaValue\">20%</strong>\n"
         "      <label><input id=\"showArcs\" type=\"checkbox\" checked/> Show arcs</label>\n"
         "      <label><input id=\"showWire\" type=\"checkbox\" checked/> Show simulated profile</label>\n"
         "    </div>\n"
+        "    <div class=\"small\">Camera orbit is 3D-projected. Increase View gain if angle motion feels too subtle.</div>\n"
         "    <div class=\"panel\">\n"
         f"      <canvas id=\"sim\" width=\"{width}\" height=\"{height}\"></canvas>\n"
         "    </div>\n"
@@ -476,10 +477,83 @@ def write_simulation_html(
         "    const ctx = canvas.getContext('2d');\n"
         "    const angleInput = document.getElementById('angle');\n"
         "    const angleValue = document.getElementById('angleValue');\n"
+        "    const camYaw = document.getElementById('camYaw');\n"
+        "    const camYawValue = document.getElementById('camYawValue');\n"
+        "    const camPitch = document.getElementById('camPitch');\n"
+        "    const camPitchValue = document.getElementById('camPitchValue');\n"
+        "    const camZoom = document.getElementById('camZoom');\n"
+        "    const camZoomValue = document.getElementById('camZoomValue');\n"
+        "    const viewGain = document.getElementById('viewGain');\n"
+        "    const viewGainValue = document.getElementById('viewGainValue');\n"
+        "    const arcStride = document.getElementById('arcStride');\n"
+        "    const arcStrideValue = document.getElementById('arcStrideValue');\n"
+        "    const arcLimit = document.getElementById('arcLimit');\n"
+        "    const arcLimitValue = document.getElementById('arcLimitValue');\n"
+        "    const arcMinR = document.getElementById('arcMinR');\n"
+        "    const arcMinRValue = document.getElementById('arcMinRValue');\n"
+        "    const arcAlpha = document.getElementById('arcAlpha');\n"
+        "    const arcAlphaValue = document.getElementById('arcAlphaValue');\n"
         "    const showArcs = document.getElementById('showArcs');\n"
         "    const showWire = document.getElementById('showWire');\n"
-        "    function pointAtAngle(p, deg) {\n"
-        "      const dist = p[2] - data.nView;\n"
+        "    const baseCamera = data.camera;\n"
+        "    const vAdd = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];\n"
+        "    const vSub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];\n"
+        "    const vDot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];\n"
+        "    const vCross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];\n"
+        "    const vNorm = (a) => Math.sqrt(vDot(a,a));\n"
+        "    const vNormalize = (a) => { const n = vNorm(a); return (n < 1e-12) ? [0,0,0] : [a[0]/n,a[1]/n,a[2]/n]; };\n"
+        "    function rotY(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [c*v[0]+s*v[2], v[1], -s*v[0]+c*v[2]]; }\n"
+        "    function rotX(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [v[0], c*v[1]-s*v[2], s*v[1]+c*v[2]]; }\n"
+        "    function buildCameraState() {\n"
+        "      const yaw = Number(camYaw.value) * Math.PI / 180.0;\n"
+        "      const pitch = Number(camPitch.value) * Math.PI / 180.0;\n"
+        "      const zoom = Number(camZoom.value) / 100.0;\n"
+        "      const pr = baseCamera.pr;\n"
+        "      const dir = vSub(baseCamera.po, pr);\n"
+        "      const look = baseCamera.lookUp;\n"
+        "      const dirRot = rotX(rotY(dir, yaw), pitch);\n"
+        "      const lookRot = vNormalize(rotX(rotY(look, yaw), pitch));\n"
+        "      return {\n"
+        "        po: vAdd(pr, dirRot),\n"
+        "        pr: pr,\n"
+        "        lookUp: lookRot,\n"
+        "        currentScale: baseCamera.currentScale * zoom,\n"
+        "        zf: baseCamera.zf,\n"
+        "        canvasWidth: baseCamera.canvasWidth,\n"
+        "        canvasHeight: baseCamera.canvasHeight,\n"
+        "      };\n"
+        "    }\n"
+        "    function buildModelToWindow(cam) {\n"
+        "      const n = vNormalize(vSub(cam.po, cam.pr));\n"
+        "      let u = vCross(cam.lookUp, n);\n"
+        "      u = vNormalize(u);\n"
+        "      const v = vCross(n, u);\n"
+        "      const m11=u[0], m12=u[1], m13=u[2], m14=-vDot(u,cam.po);\n"
+        "      const m21=v[0], m22=v[1], m23=v[2], m24=-vDot(v,cam.po);\n"
+        "      const m31=n[0], m32=n[1], m33=n[2], m34=-vDot(n,cam.po);\n"
+        "      const p43 = -1.0 / ((Math.abs(cam.zf) < 1e-12) ? 1e-5 : cam.zf);\n"
+        "      const baseScale = cam.canvasWidth / 17.0;\n"
+        "      const scale = baseScale * cam.currentScale;\n"
+        "      return {\n"
+        "        m11,m12,m13,m14,m21,m22,m23,m24,m31,m32,m33,m34,\n"
+        "        p43, scale, tx: cam.canvasWidth / 2.0, ty: cam.canvasHeight / 2.0\n"
+        "      };\n"
+        "    }\n"
+        "    function projectPoint(p, m) {\n"
+        "      const x = p[0], y = p[1], z = p[2];\n"
+        "      const v1 = m.m11*x + m.m12*y + m.m13*z + m.m14;\n"
+        "      const v2 = m.m21*x + m.m22*y + m.m23*z + m.m24;\n"
+        "      const v3 = m.m31*x + m.m32*y + m.m33*z + m.m34;\n"
+        "      const w = (m.p43 * v3) + 1.0;\n"
+        "      if (!Number.isFinite(w) || Math.abs(w) < 1e-9) return null;\n"
+        "      const vx = (v1 / w) * m.scale + m.tx;\n"
+        "      const vy = -((v2 / w) * m.scale) + m.ty;\n"
+        "      const vz = (v3 / w) * m.scale;\n"
+        "      if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return null;\n"
+        "      return [vx, vy, vz];\n"
+        "    }\n"
+        "    function pointAtAngleProjected(p, deg, nView, gain) {\n"
+        "      const dist = (p[2] - nView) * gain;\n"
         "      const cx = p[0];\n"
         "      const cy = p[1] - dist / 2.0;\n"
         "      const oy = dist / 2.0;\n"
@@ -490,43 +564,94 @@ def write_simulation_html(
         "    }\n"
         "    function draw() {\n"
         "      const angle = Number(angleInput.value);\n"
-        "      angleValue.textContent = `${angle.toFixed(0)}°`;\n"
+        "      angleValue.textContent = `${angle.toFixed(0)} deg`;\n"
+        "      camYawValue.textContent = `${Number(camYaw.value).toFixed(0)} deg`;\n"
+        "      camPitchValue.textContent = `${Number(camPitch.value).toFixed(0)} deg`;\n"
+        "      camZoomValue.textContent = `${Number(camZoom.value).toFixed(0)}%`;\n"
+        "      viewGainValue.textContent = `${(Number(viewGain.value) / 100.0).toFixed(1)}x`;\n"
+        "      arcStrideValue.textContent = `${Number(arcStride.value).toFixed(0)}`;\n"
+        "      arcLimitValue.textContent = `${Number(arcLimit.value).toFixed(0)}`;\n"
+        "      arcMinRValue.textContent = `${Number(arcMinR.value).toFixed(0)}`;\n"
+        "      arcAlphaValue.textContent = `${Number(arcAlpha.value).toFixed(0)}%`;\n"
         "      ctx.clearRect(0, 0, canvas.width, canvas.height);\n"
+        "      const cam = buildCameraState();\n"
+        "      const m = buildModelToWindow(cam);\n"
+        "      const prView = projectPoint(cam.pr, m);\n"
+        "      if (!prView) return;\n"
+        "      const nView = prView[2];\n"
+        "      const proj = new Array(data.vertices.length);\n"
+        "      for (let i = 0; i < data.vertices.length; i++) {\n"
+        "        proj[i] = projectPoint(data.vertices[i], m);\n"
+        "      }\n"
+        "      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;\n"
+        "      for (const p of proj) {\n"
+        "        if (!p) continue;\n"
+        "        if (p[0] < minX) minX = p[0];\n"
+        "        if (p[1] < minY) minY = p[1];\n"
+        "        if (p[0] > maxX) maxX = p[0];\n"
+        "        if (p[1] > maxY) maxY = p[1];\n"
+        "      }\n"
+        "      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;\n"
+        "      const tx = (canvas.width / 2.0) - ((minX + maxX) / 2.0);\n"
+        "      const ty = (canvas.height / 2.0) - ((minY + maxY) / 2.0);\n"
+        "      const gain = Number(viewGain.value) / 100.0;\n"
         "      if (showArcs.checked) {\n"
-        "        ctx.strokeStyle = 'rgba(190, 190, 190, 0.22)';\n"
-        "        ctx.lineWidth = 1;\n"
-        "        for (const a of data.arcs) {\n"
-        "          const x = a[0] + data.offsetX;\n"
-        "          const y = a[1] + data.offsetY;\n"
-        "          const w = a[2];\n"
-        "          const h = a[3];\n"
-        "          const startDeg = a[4];\n"
-        "          const cx = x + w / 2.0;\n"
-        "          const cy = y + h / 2.0;\n"
-        "          const r = w / 2.0;\n"
-        "          const start = (startDeg === 0) ? 0 : Math.PI;\n"
-        "          ctx.beginPath();\n"
-        "          ctx.arc(cx, cy, r, start, start + Math.PI, false);\n"
-        "          ctx.stroke();\n"
+        "        const stride = Math.max(1, Number(arcStride.value));\n"
+        "        const limit = Math.max(100, Number(arcLimit.value));\n"
+        "        const minR = Math.max(0, Number(arcMinR.value));\n"
+        "        const alpha = Math.max(0.01, Number(arcAlpha.value) / 100.0);\n"
+        "        ctx.strokeStyle = `rgba(190,190,190,${alpha.toFixed(3)})`;\n"
+        "        ctx.lineWidth = 0.9;\n"
+        "        let drawn = 0;\n"
+        "        edgeLoop: for (const e of data.edges) {\n"
+        "          const p0 = proj[e[0]];\n"
+        "          const p1 = proj[e[1]];\n"
+        "          if (!p0 || !p1) continue;\n"
+        "          const samples = Math.max(2, e[2]);\n"
+        "          for (let k = 0; k < samples; k += stride) {\n"
+        "            const t = (samples <= 1) ? 0.0 : (k / (samples - 1));\n"
+            "            const px = p0[0] + (p1[0] - p0[0]) * t;\n"
+            "            const py = p0[1] + (p1[1] - p0[1]) * t;\n"
+            "            const pz = p0[2] + (p1[2] - p0[2]) * t;\n"
+        "            const dist = (pz - nView) * gain;\n"
+            "            const r = Math.abs(dist) / 2.0;\n"
+        "            if (r < minR || r < data.minArcRadius * 0.25) continue;\n"
+        "            const cx = px + tx;\n"
+        "            const cy = (py - dist / 2.0) + ty;\n"
+            "            const start = (dist > 0) ? 0 : Math.PI;\n"
+        "            ctx.beginPath();\n"
+        "            ctx.arc(cx, cy, r, start, start + Math.PI, false);\n"
+        "            ctx.stroke();\n"
+        "            drawn += 1;\n"
+        "            if (drawn >= limit) break edgeLoop;\n"
+        "          }\n"
         "        }\n"
         "      }\n"
         "      if (showWire.checked) {\n"
-        "        ctx.strokeStyle = '#f5f5f5';\n"
-        "        ctx.lineWidth = 1.4;\n"
-        "        for (const path of data.paths) {\n"
-        "          if (path.length < 2) continue;\n"
+        "        ctx.strokeStyle = 'rgba(245,245,245,0.92)';\n"
+        "        ctx.lineWidth = 1.5;\n"
+        "        for (const edge of data.edges) {\n"
+        "          const q1 = proj[edge[0]];\n"
+        "          const q2 = proj[edge[1]];\n"
+        "          if (!q1 || !q2) continue;\n"
+        "          const p1 = pointAtAngleProjected(q1, angle, nView, gain);\n"
+        "          const p2 = pointAtAngleProjected(q2, angle, nView, gain);\n"
         "          ctx.beginPath();\n"
-        "          for (let i = 0; i < path.length; i++) {\n"
-        "            const p = pointAtAngle(path[i], angle);\n"
-        "            const x = p[0] + data.offsetX;\n"
-        "            const y = p[1] + data.offsetY;\n"
-        "            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);\n"
-        "          }\n"
+        "          ctx.moveTo(p1[0] + tx, p1[1] + ty);\n"
+        "          ctx.lineTo(p2[0] + tx, p2[1] + ty);\n"
         "          ctx.stroke();\n"
         "        }\n"
         "      }\n"
         "    }\n"
         "    angleInput.addEventListener('input', draw);\n"
+        "    camYaw.addEventListener('input', draw);\n"
+        "    camPitch.addEventListener('input', draw);\n"
+        "    camZoom.addEventListener('input', draw);\n"
+        "    viewGain.addEventListener('input', draw);\n"
+        "    arcStride.addEventListener('input', draw);\n"
+        "    arcLimit.addEventListener('input', draw);\n"
+        "    arcMinR.addEventListener('input', draw);\n"
+        "    arcAlpha.addEventListener('input', draw);\n"
         "    showArcs.addEventListener('change', draw);\n"
         "    showWire.addEventListener('change', draw);\n"
         "    draw();\n"
@@ -744,19 +869,18 @@ def run(args: argparse.Namespace) -> int:
     write_svg(args.svg, arcs, stroke_width=pipeline.stroke_width)
 
     if args.simulate_html is not None:
-        sim_paths = build_simulation_paths(
+        sim_edges = build_simulation_edge_info(
             model_vertices=model_vertices,
-            zero_vertices=zero_vertices,
             edges=edges,
             view_points_per_unit_length=pipeline.line_resolution,
-            n_view=n_view,
-            min_arc_radius=pipeline.min_arc_radius,
         )
         write_simulation_html(
             html_path=args.simulate_html,
-            paths=sim_paths,
+            model_vertices=model_vertices,
+            sim_edges=sim_edges,
+            camera=camera,
             arcs=arcs,
-            n_view=n_view,
+            min_arc_radius=pipeline.min_arc_radius,
         )
 
     if args.json is not None:

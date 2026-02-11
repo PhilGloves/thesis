@@ -52,7 +52,7 @@ python -m venv .venv
 ## Output
 
 - SVG con soli path ad arco (`M ... A ...`).
-- HTML interattivo opzionale con slider `View angle` per simulare il movimento percepito.
+- HTML interattivo opzionale con slider `View angle` + controlli camera 3D (`yaw`, `pitch`, `zoom`) e filtri archi (`stride`, `limit`, `alpha`).
 - JSON opzionale con:
   - configurazione camera/pipeline;
   - numero archi/spigoli;
