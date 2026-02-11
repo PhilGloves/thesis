@@ -1,0 +1,34 @@
+{
+  "config": {
+    "width_mm": 80.0,
+    "height_mm": 80.0,
+    "margin_mm": 5.0,
+    "samples": 5000,
+    "shininess": 30.0,
+    "min_len_mm": 0.3,
+    "max_len_mm": 1.8,
+    "spec_threshold": 0.08,
+    "max_segments": 12000,
+    "stroke_mm": 0.12,
+    "light_dir": [
+      0.4,
+      0.2,
+      1.0
+    ],
+    "view_dir": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "seed": 42
+  },
+  "stats": {
+    "total_samples": 5000,
+    "kept_segments": 0,
+    "spec_min": 0.0,
+    "spec_max": 0.06490547151887457,
+    "spec_mean": 0.021146202620849337
+  },
+  "kept_sample_indices": [],
+  "segments": []
+}
