@@ -1,9 +1,0 @@
-[{"Color":"Black","Start":{"IsEmpty":false,"X":319.0,"Y":160.0},"End":{"IsEmpty":false,"X":390.0,"Y":345.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":366.0,"Y":218.0},"End":{"IsEmpty":false,"X":307.0,"Y":55.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":307.0,"Y":55.0},"End":{"IsEmpty":false,"X":319.0,"Y":160.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":117.0,"Y":120.0},"End":{"IsEmpty":false,"X":307.0,"Y":55.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":181.0,"Y":401.0},"End":{"IsEmpty":false,"X":81.0,"Y":235.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":81.0,"Y":235.0},"End":{"IsEmpty":false,"X":117.0,"Y":120.0}},
-{"Color":"Black","Start":{"IsEmpty":false,"X":319.0,"Y":160.0},"End":{"IsEmpty":false,"X":81.0,"Y":235.0}},
-{"Color":"Purple","Path":[{"Item1":{"IsEmpty":false,"X":390.203339,"Y":345.7427},"Item2":{"IsEmpty":false,"X":366.3673,"Y":218.962677}},
-{"Item1":{"IsEmpty":false,"X":181.243454,"Y":401.2451},"Item2":{"IsEmpty":false,"X":390.203339,"Y":345.7427}}]}]

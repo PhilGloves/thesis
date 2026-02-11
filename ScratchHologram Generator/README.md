@@ -1,104 +1,64 @@
 # ScratchHologram Generator
 
-Pipeline Python per generare traiettorie di scratch hologram su piano 2D a partire da un file STL.
+Generatore Python di archi tipo HoloZens a partire da file STL.
 
-## Cosa fa
+Questa versione produce **solo archi** (niente linee/profili), con una pipeline edge-based:
 
-1. Carica una mesh STL triangolare.
-2. Campiona punti sulla superficie della mesh.
-3. Calcola una intensita speculare semplificata (modello geometrico tipo Phong).
-4. Proietta i punti sul piano XY.
-5. Genera segmenti di incisione orientati secondo la riflessione speculare.
-6. Esporta in SVG.
-7. Opzionale: esporta G-code e JSON diagnostico.
+1. Carica STL.
+2. Estrae vertici e spigoli unici.
+3. Applica camera/proiezione in stile HoloZens.
+4. Campiona punti lungo ogni spigolo (line resolution).
+5. Converte ogni punto in arco 180°.
+6. Esporta SVG (opzionale JSON debug).
 
 ## File inclusi
 
-- `scratch_pipeline.py`: script principale.
+- `scratch_pipeline.py`: script principale arc-based.
 - `requirements.txt`: dipendenze Python.
 
 ## Requisiti
 
-- Python 3.10+ (testato con Python 3.14)
+- Python 3.10+ (testato con Python 3.14).
 
-## Setup rapido (Windows PowerShell)
+## Setup (PowerShell)
 
 ```powershell
 cd "c:\Users\filip\Documents\thesis\ScratchHologram Generator"
 python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## Primo test consigliato (cubo semplice)
-
-Usa lo STL gia presente nel workspace:
+## Test richiesto (basic cube)
 
 ```powershell
-python .\scratch_pipeline.py `
+.\.venv\Scripts\python.exe .\scratch_pipeline.py `
   --stl "..\knots\basic_cube_-_10mm.stl" `
-  --svg ".\out\cube_scratch.svg" `
-  --gcode ".\out\cube_scratch.gcode" `
-  --json ".\out\cube_scratch_debug.json" `
-  --samples 5000 `
-  --width-mm 80 --height-mm 80 `
-  --shininess 30 `
-  --spec-threshold 0.08 `
-  --seed 42
+  --svg ".\out\basic_cube_holozens_arcs.svg" `
+  --simulate-html ".\out\basic_cube_simulation.html" `
+  --json ".\out\basic_cube_holozens_arcs.json" `
+  --line-resolution 3.28 `
+  --min-arc-radius 6
 ```
-
-Output attesi:
-
-- `out/cube_scratch.svg`
-- `out/cube_scratch.gcode` (se richiesto)
-- `out/cube_scratch_debug.json` (se richiesto)
 
 ## Parametri principali
 
-- `--samples`: numero di punti campionati sulla superficie.
-- `--shininess`: selettivita speculare (piu alto = highlight piu stretti).
-- `--spec-threshold`: soglia minima per tenere uno scratch.
-- `--min-len-mm`, `--max-len-mm`: lunghezze minima/massima dei segmenti.
-- `--light LX LY LZ`: direzione luce globale.
-- `--view VX VY VZ`: direzione osservatore globale.
-- `--max-segments`: limite superiore segmenti esportati.
+- `--line-resolution`: punti per unità di lunghezza spigolo.
+- `--min-arc-radius`: filtra gli archi troppo piccoli (utile per pulire il risultato).
+- `--canvas-width`, `--canvas-height`: dimensione canvas camera.
+- `--po`, `--pr`, `--look-up`, `--zf`, `--current-scale`: parametri camera.
+- `--stroke-width`: spessore arco nello SVG (solo visualizzazione, non incisione fisica).
+- `--no-auto-center`: disabilita l'allineamento Z automatico del modello.
 
-## Esempi utili
+## Output
 
-Solo SVG:
+- SVG con soli path ad arco (`M ... A ...`).
+- HTML interattivo opzionale con slider `View angle` per simulare il movimento percepito.
+- JSON opzionale con:
+  - configurazione camera/pipeline;
+  - numero archi/spigoli;
+  - parametri geometrici di ogni arco.
 
-```powershell
-python .\scratch_pipeline.py --stl "..\knots\trefoil.stl" --svg ".\out\trefoil.svg"
-```
+## Note
 
-Direzione luce diversa:
-
-```powershell
-python .\scratch_pipeline.py `
-  --stl "..\knots\TrefoilKnot.stl" `
-  --svg ".\out\trefoil_luce_laterale.svg" `
-  --light 1.0 0.0 0.5 `
-  --view 0.0 0.0 1.0
-```
-
-## Note sul modello fisico
-
-Il modello implementato e volutamente semplificato:
-
-- non simula ottica ondulatoria;
-- usa riflessione speculare geometrica locale su normali di faccia;
-- e adatto come base riproducibile per una tesi triennale e per iterazioni successive.
-
-## Troubleshooting
-
-Se vedi errore su pacchetti mancanti:
-
-```powershell
-pip install -r requirements.txt
-```
-
-Se ottieni pochi segmenti:
-
-- abbassa `--spec-threshold` (es. `0.05`)
-- riduci `--shininess` (es. `20`)
-- aumenta `--samples` (es. `15000`)
+- Obiettivo: comportamento vicino a HoloZens lato geometria archi.
+- Non include ancora GUI, linee/profili o export G-code.
