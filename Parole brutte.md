@@ -123,6 +123,19 @@ Hai ora un generatore robusto STL -> SVG e una preview parametrica molto più vi
 
 
 
+È stata sviluppata una GUI desktop in Python che integra visualizzazione interattiva e generazione degli scratch hologram, eliminando la dipendenza dalla preview HTML separata.
+L’interfaccia è stata semplificata in modalità single-view, mostrando direttamente la preview degli archi su un’unica canvas.
+La camera è controllabile con interazione diretta (drag per orbit, rotellina per zoom), così da impostare la vista di lavoro prima dell’esportazione.
+Per ridurre il carico computazionale su mesh complesse, è stato introdotto un campionamento adattivo degli spigoli in preview.
+L’algoritmo di alleggerimento agisce sia sul sottoinsieme di spigoli elaborati sia sulla line resolution effettiva, mantenendo la leggibilità visiva.
+Durante il movimento della camera viene usata una modalità veloce, mentre a interazione terminata viene aggiornata una preview più accurata.
+L’esportazione SVG viene invece eseguita in modalità completa, garantendo coerenza geometrica e qualità del risultato finale.
+È stato aggiunto un controllo esplicito della qualità di preview, utile per bilanciare fluidità e dettaglio in funzione dell’hardware disponibile.
+I test su modelli semplici (cubo) e ad alta complessità topologica (trefoil) mostrano un miglioramento significativo della reattività dell’interfaccia.
+Questa scelta progettuale separa efficacemente rendering interattivo ed export finale, mantenendo una pipeline stabile e riproducibile.
+
+
+
 ------------------------------
 
 

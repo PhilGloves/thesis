@@ -34,8 +34,13 @@ python -m venv .venv
 Nell'app puoi:
 1. caricare STL (`Apri STL`);
 2. ruotare la camera direttamente sulla preview archi (drag) e zoomare con rotellina;
-3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, ecc.);
+3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, view angle/view gain, ecc.);
 4. esportare lo SVG della vista corrente (`Esporta SVG`).
+
+Note preview:
+- `Preview quality` influenza davvero dettaglio e velocita` (campionamento edge + line resolution effettiva).
+- durante il drag la preview passa in modalita` `FAST` per ridurre il lag.
+- `View angle` + `Show simulated profile` simulano il movimento osservato nello scratch hologram.
 
 ## Uso CLI (pipeline)
 
