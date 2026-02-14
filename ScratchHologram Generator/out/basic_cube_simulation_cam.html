@@ -26,6 +26,16 @@
       <strong id="camPitchValue">0 deg</strong>
       <label>Zoom: <input id="camZoom" type="range" min="60" max="220" step="1" value="100"/></label>
       <strong id="camZoomValue">100%</strong>
+      <label>Mode:
+        <select id="renderMode">
+          <option value="combined" selected>Combined</option>
+          <option value="pattern">Pattern</option>
+          <option value="wire">Wireframe</option>
+          <option value="opaque">Opaque</option>
+        </select>
+      </label>
+      <label>Light: <input id="lightAngle" type="range" min="-180" max="180" step="1" value="30"/></label>
+      <strong id="lightAngleValue">30 deg</strong>
       <label>View gain: <input id="viewGain" type="range" min="10" max="300" step="5" value="100"/></label>
       <strong id="viewGainValue">1.0x</strong>
       <label>Arc stride: <input id="arcStride" type="range" min="1" max="12" step="1" value="4"/></label>
@@ -38,18 +48,20 @@
       <strong id="depthMixValue">70%</strong>
       <label>Thresh: <input id="thresh" type="range" min="0" max="90" step="1" value="10"/></label>
       <strong id="threshValue">10%</strong>
+      <label>Model alpha: <input id="modelAlpha" type="range" min="5" max="95" step="1" value="30"/></label>
+      <strong id="modelAlphaValue">30%</strong>
       <label>Arc alpha: <input id="arcAlpha" type="range" min="2" max="80" step="1" value="20"/></label>
       <strong id="arcAlphaValue">20%</strong>
       <label><input id="showArcs" type="checkbox" checked/> Show arcs</label>
       <label><input id="showWire" type="checkbox" checked/> Show simulated profile</label>
     </div>
-    <div class="small">Camera orbit is 3D-projected. Depth sort is enabled for arcs (far to near).</div>
+    <div class="small">Camera orbit is 3D-projected. Pattern uses depth sort + light threshold.</div>
     <div class="panel">
       <canvas id="sim" width="246" height="247"></canvas>
     </div>
   </div>
   <script>
-    const data = {"minArcRadius":6.0,"camera":{"po":[0.9,9.008,23.978],"pr":[0.937,8.29,0.472],"lookUp":[0.0,1.0,0.0],"currentScale":0.7239993109254925,"zf":25.0,"canvasWidth":710,"canvasHeight":549},"vertices":[[-5.0,-5.0,-10.0],[-5.0,-5.0,0.0],[-5.0,5.0,0.0],[-5.0,5.0,-10.0],[5.0,5.0,0.0],[5.0,5.0,-10.0],[5.0,-5.0,0.0],[5.0,-5.0,-10.0]],"edges":[[0,1,32],[1,2,32],[2,3,32],[3,0,32],[2,4,32],[4,5,32],[5,3,32],[4,6,32],[6,7,32],[7,5,32],[6,1,32],[0,7,32]]};
+    const data = {"minArcRadius":6.0,"camera":{"po":[0.9,9.008,23.978],"pr":[0.937,8.29,0.472],"lookUp":[0.0,1.0,0.0],"currentScale":0.7239993109254925,"zf":25.0,"canvasWidth":710,"canvasHeight":549},"vertices":[[-5.0,-5.0,-10.0],[-5.0,-5.0,0.0],[-5.0,5.0,0.0],[-5.0,5.0,-10.0],[5.0,5.0,0.0],[5.0,5.0,-10.0],[5.0,-5.0,0.0],[5.0,-5.0,-10.0]],"edges":[[0,1,32,-0.707107,-0.707107,0.0],[1,2,32,-0.707107,0.0,0.707107],[2,3,32,-0.707107,0.707107,0.0],[3,0,32,-0.707107,0.0,-0.707107],[2,4,32,0.0,0.707107,0.707107],[4,5,32,0.707107,0.707107,0.0],[5,3,32,0.0,0.707107,-0.707107],[4,6,32,0.707107,0.0,0.707107],[6,7,32,0.707107,-0.707107,0.0],[7,5,32,0.707107,0.0,-0.707107],[6,1,32,0.0,-0.707107,0.707107],[0,7,32,0.0,-0.707107,-0.707107]],"faces":[[0,1,2,-1.0,0.0,0.0],[0,2,3,-1.0,0.0,0.0],[3,2,4,0.0,1.0,0.0],[3,4,5,0.0,1.0,0.0],[5,4,6,1.0,0.0,-0.0],[5,6,7,1.0,0.0,0.0],[7,6,1,0.0,-1.0,0.0],[7,1,0,0.0,-1.0,0.0],[3,5,7,0.0,0.0,-1.0],[3,7,0,0.0,0.0,-1.0],[4,2,1,0.0,0.0,1.0],[4,1,6,0.0,0.0,1.0]]};
     const canvas = document.getElementById('sim');
     const ctx = canvas.getContext('2d');
     const angleInput = document.getElementById('angle');
@@ -60,6 +72,9 @@
     const camPitchValue = document.getElementById('camPitchValue');
     const camZoom = document.getElementById('camZoom');
     const camZoomValue = document.getElementById('camZoomValue');
+    const renderMode = document.getElementById('renderMode');
+    const lightAngle = document.getElementById('lightAngle');
+    const lightAngleValue = document.getElementById('lightAngleValue');
     const viewGain = document.getElementById('viewGain');
     const viewGainValue = document.getElementById('viewGainValue');
     const arcStride = document.getElementById('arcStride');
@@ -72,6 +87,8 @@
     const depthMixValue = document.getElementById('depthMixValue');
     const thresh = document.getElementById('thresh');
     const threshValue = document.getElementById('threshValue');
+    const modelAlpha = document.getElementById('modelAlpha');
+    const modelAlphaValue = document.getElementById('modelAlphaValue');
     const arcAlpha = document.getElementById('arcAlpha');
     const arcAlphaValue = document.getElementById('arcAlphaValue');
     const showArcs = document.getElementById('showArcs');
@@ -79,12 +96,22 @@
     const baseCamera = data.camera;
     const vAdd = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
     const vSub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+    const vScale = (a,s) => [a[0]*s, a[1]*s, a[2]*s];
     const vDot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
     const vCross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
     const vNorm = (a) => Math.sqrt(vDot(a,a));
     const vNormalize = (a) => { const n = vNorm(a); return (n < 1e-12) ? [0,0,0] : [a[0]/n,a[1]/n,a[2]/n]; };
+    const vClamp01 = (x) => Math.max(0.0, Math.min(1.0, x));
+    function reflect(i, n) { const k = 2.0 * vDot(i, n); return [i[0]-k*n[0], i[1]-k*n[1], i[2]-k*n[2]]; }
     function rotY(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [c*v[0]+s*v[2], v[1], -s*v[0]+c*v[2]]; }
     function rotX(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [v[0], c*v[1]-s*v[2], s*v[1]+c*v[2]]; }
+    function buildLightDirection() {
+      const az = Number(lightAngle.value) * Math.PI / 180.0;
+      const elevation = 20.0 * Math.PI / 180.0;
+      const c = Math.cos(elevation);
+      const v = [Math.cos(az) * c, Math.sin(elevation), Math.sin(az) * c];
+      return vNormalize(v);
+    }
     function buildCameraState() {
       const yaw = Number(camYaw.value) * Math.PI / 180.0;
       const pitch = Number(camPitch.value) * Math.PI / 180.0;
@@ -149,12 +176,14 @@
       camYawValue.textContent = `${Number(camYaw.value).toFixed(0)} deg`;
       camPitchValue.textContent = `${Number(camPitch.value).toFixed(0)} deg`;
       camZoomValue.textContent = `${Number(camZoom.value).toFixed(0)}%`;
+      lightAngleValue.textContent = `${Number(lightAngle.value).toFixed(0)} deg`;
       viewGainValue.textContent = `${(Number(viewGain.value) / 100.0).toFixed(1)}x`;
       arcStrideValue.textContent = `${Number(arcStride.value).toFixed(0)}`;
       arcLimitValue.textContent = `${Number(arcLimit.value).toFixed(0)}`;
       arcMinRValue.textContent = `${Number(arcMinR.value).toFixed(0)}`;
       depthMixValue.textContent = `${Number(depthMix.value).toFixed(0)}%`;
       threshValue.textContent = `${Number(thresh.value).toFixed(0)}%`;
+      modelAlphaValue.textContent = `${Number(modelAlpha.value).toFixed(0)}%`;
       arcAlphaValue.textContent = `${Number(arcAlpha.value).toFixed(0)}%`;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const cam = buildCameraState();
@@ -178,7 +207,49 @@
       const tx = (canvas.width / 2.0) - ((minX + maxX) / 2.0);
       const ty = (canvas.height / 2.0) - ((minY + maxY) / 2.0);
       const gain = Number(viewGain.value) / 100.0;
-      if (showArcs.checked) {
+      const lightDir = buildLightDirection();
+      const mode = renderMode.value;
+      const wantPattern = showArcs.checked && (mode === 'combined' || mode === 'pattern');
+      const wantWire = showWire.checked && (mode === 'combined' || mode === 'wire');
+      const wantOpaque = (mode === 'combined' || mode === 'opaque');
+      if (wantOpaque && Array.isArray(data.faces) && data.faces.length > 0) {
+        const tris = [];
+        const mAlpha = Math.max(0.05, Number(modelAlpha.value) / 100.0);
+        for (const f of data.faces) {
+          const q0 = proj[f[0]];
+          const q1 = proj[f[1]];
+          const q2 = proj[f[2]];
+          if (!q0 || !q1 || !q2) continue;
+          let n = vNormalize([f[3], f[4], f[5]]);
+          if (vNorm(n) < 1e-9) continue;
+          const m0 = data.vertices[f[0]];
+          const m1 = data.vertices[f[1]];
+          const m2 = data.vertices[f[2]];
+          const mc = [(m0[0] + m1[0] + m2[0]) / 3.0, (m0[1] + m1[1] + m2[1]) / 3.0, (m0[2] + m1[2] + m2[2]) / 3.0];
+          const toEye = vNormalize(vSub(cam.po, mc));
+          if (vDot(n, toEye) < 0.0) n = vScale(n, -1.0);
+          const ndotl = Math.max(0.0, vDot(n, lightDir));
+          const shade = 0.15 + 0.85 * ndotl;
+          const z = (q0[2] + q1[2] + q2[2]) / 3.0;
+          tris.push({ z, q0, q1, q2, shade, alpha: mAlpha });
+        }
+        tris.sort((a, b) => a.z - b.z);
+        ctx.lineWidth = 0.6;
+        for (const t of tris) {
+          const c = Math.round(24 + 92 * t.shade);
+          const b = Math.round(58 + 140 * t.shade);
+          ctx.fillStyle = `rgba(${c},${c},${b},${t.alpha.toFixed(3)})`;
+          ctx.strokeStyle = `rgba(210,225,255,${Math.min(0.80, t.alpha + 0.16).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(t.q0[0] + tx, t.q0[1] + ty);
+          ctx.lineTo(t.q1[0] + tx, t.q1[1] + ty);
+          ctx.lineTo(t.q2[0] + tx, t.q2[1] + ty);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      if (wantPattern) {
         const stride = Math.max(1, Number(arcStride.value));
         const limit = Math.max(100, Number(arcLimit.value));
         const minR = Math.max(0, Number(arcMinR.value));
@@ -192,19 +263,33 @@
           const p0 = proj[e[0]];
           const p1 = proj[e[1]];
           if (!p0 || !p1) continue;
+          const m0 = data.vertices[e[0]];
+          const m1 = data.vertices[e[1]];
+          const nEdgeBase = vNormalize([e[3], e[4], e[5]]);
           const samples = Math.max(2, e[2]);
           for (let k = 0; k < samples; k += stride) {
             const t = (samples <= 1) ? 0.0 : (k / (samples - 1));
             const px = p0[0] + (p1[0] - p0[0]) * t;
             const py = p0[1] + (p1[1] - p0[1]) * t;
             const pz = p0[2] + (p1[2] - p0[2]) * t;
+            const mx = m0[0] + (m1[0] - m0[0]) * t;
+            const my = m0[1] + (m1[1] - m0[1]) * t;
+            const mz = m0[2] + (m1[2] - m0[2]) * t;
+            const pm = [mx, my, mz];
+            const toEye = vNormalize(vSub(cam.po, pm));
+            let nEdge = nEdgeBase;
+            if (vDot(nEdge, toEye) < 0.0) nEdge = vScale(nEdge, -1.0);
+            const ndotl = Math.max(0.0, vDot(nEdge, lightDir));
+            const halfV = vNormalize(vAdd(lightDir, toEye));
+            const spec = Math.pow(Math.max(0.0, vDot(nEdge, halfV)), 20.0);
+            const lightScore = vClamp01(0.35 * ndotl + 0.90 * spec);
             const dist = (pz - nView) * gain;
             const r = Math.abs(dist) / 2.0;
             if (r < minR || r < data.minArcRadius * 0.25) continue;
             const cx = px + tx;
             const cy = (py - dist / 2.0) + ty;
             const start = (dist > 0) ? 0 : Math.PI;
-            candidates.push({ z: pz, cx, cy, r, start });
+            candidates.push({ z: pz, cx, cy, r, start, light: lightScore });
             if (candidates.length >= sampleCap) break collectLoop;
           }
         }
@@ -219,10 +304,14 @@
           for (const c of candidates) {
             const depthNorm = (c.z - zMin) / zSpan;
             if (depthNorm < depthGate) continue;
-            const gated = (depthNorm - depthGate) / depthDen;
-            if (gated < threshold) continue;
-            const a = Math.max(0.01, Math.min(1.0, baseAlpha * (0.15 + 0.85 * gated)));
-            ctx.strokeStyle = `rgba(190,190,190,${a.toFixed(3)})`;
+            const depthScore = vClamp01((depthNorm - depthGate) / depthDen);
+            const score = depthScore * c.light;
+            if (score < threshold) continue;
+            const a = Math.max(0.01, Math.min(1.0, baseAlpha * (0.12 + 0.88 * score)));
+            const rr = Math.round(130 + 90 * c.light);
+            const gg = Math.round(165 + 80 * c.light);
+            const bb = Math.round(70 + 60 * (1.0 - c.light));
+            ctx.strokeStyle = `rgba(${rr},${gg},${bb},${a.toFixed(3)})`;
             ctx.beginPath();
             ctx.arc(c.cx, c.cy, c.r, c.start, c.start + Math.PI, false);
             ctx.stroke();
@@ -231,7 +320,7 @@
           }
         }
       }
-      if (showWire.checked) {
+      if (wantWire) {
         ctx.strokeStyle = 'rgba(245,245,245,0.92)';
         ctx.lineWidth = 1.5;
         for (const edge of data.edges) {
@@ -251,12 +340,15 @@
     camYaw.addEventListener('input', draw);
     camPitch.addEventListener('input', draw);
     camZoom.addEventListener('input', draw);
+    renderMode.addEventListener('change', draw);
+    lightAngle.addEventListener('input', draw);
     viewGain.addEventListener('input', draw);
     arcStride.addEventListener('input', draw);
     arcLimit.addEventListener('input', draw);
     arcMinR.addEventListener('input', draw);
     depthMix.addEventListener('input', draw);
     thresh.addEventListener('input', draw);
+    modelAlpha.addEventListener('input', draw);
     arcAlpha.addEventListener('input', draw);
     showArcs.addEventListener('change', draw);
     showWire.addEventListener('change', draw);

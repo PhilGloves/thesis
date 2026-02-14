@@ -55,6 +55,7 @@ class Edge:
     edge_id: int
     start_idx: int
     end_idx: int
+    normal: tuple[float, float, float] = (0.0, 0.0, 1.0)
 
 
 @dataclass
@@ -137,7 +138,7 @@ def build_model_vertices_and_edges(
     mesh: trimesh.Trimesh,
     auto_center: bool,
     decimals: int,
-) -> tuple[np.ndarray, list[Edge]]:
+) -> tuple[np.ndarray, list[Edge], np.ndarray]:
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     faces = np.asarray(mesh.faces, dtype=np.int64)
 
@@ -171,12 +172,20 @@ def build_model_vertices_and_edges(
 
     face_normals = np.asarray(mesh.face_normals, dtype=np.float64)
 
+    remapped_faces: list[tuple[int, int, int]] = []
+    seen_faces: set[tuple[int, int, int]] = set()
+
     for face_idx, tri in enumerate(faces):
         tri_new = [int(remap[int(tri[0])]), int(remap[int(tri[1])]), int(remap[int(tri[2])])]
 
         # Skip invalid/degenerate triangles after rounding/remap.
         if len(set(tri_new)) < 3:
             continue
+
+        face_key = (tri_new[0], tri_new[1], tri_new[2])
+        if face_key not in seen_faces:
+            seen_faces.add(face_key)
+            remapped_faces.append(face_key)
 
         face_normal = normalize(face_normals[face_idx])
 
@@ -206,9 +215,29 @@ def build_model_vertices_and_edges(
             if np.all(np.abs(n0 - n1) <= normal_tol):
                 # Coplanar shared edge: skip to mimic merged faces.
                 continue
-        filtered_edges.append(edge)
+        normals_arr = np.asarray(normals, dtype=np.float64) if normals else np.zeros((0, 3), dtype=np.float64)
+        if normals_arr.shape[0] == 0:
+            edge_normal = np.asarray((0.0, 0.0, 1.0), dtype=np.float64)
+        else:
+            edge_normal = np.sum(normals_arr, axis=0)
+            if float(np.linalg.norm(edge_normal)) < EPS:
+                edge_normal = normals_arr[0]
+            edge_normal = normalize(edge_normal)
 
-    return np.asarray(unique_vertices, dtype=np.float64), filtered_edges
+        filtered_edges.append(
+            Edge(
+                edge_id=edge.edge_id,
+                start_idx=edge.start_idx,
+                end_idx=edge.end_idx,
+                normal=(float(edge_normal[0]), float(edge_normal[1]), float(edge_normal[2])),
+            )
+        )
+
+    remapped_faces_arr = np.asarray(remapped_faces, dtype=np.int64)
+    if remapped_faces_arr.size == 0:
+        remapped_faces_arr = np.zeros((0, 3), dtype=np.int64)
+
+    return np.asarray(unique_vertices, dtype=np.float64), filtered_edges, remapped_faces_arr
 
 
 def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
@@ -365,14 +394,23 @@ def build_simulation_edge_info(
     model_vertices: np.ndarray,
     edges: list[Edge],
     view_points_per_unit_length: float,
-) -> list[tuple[int, int, int]]:
-    sim_edges: list[tuple[int, int, int]] = []
+) -> list[tuple[int, int, int, float, float, float]]:
+    sim_edges: list[tuple[int, int, int, float, float, float]] = []
     for edge in edges:
         start = model_vertices[edge.start_idx]
         end = model_vertices[edge.end_idx]
         edge_len = float(np.linalg.norm(end - start))
         num_points = max(2, int(view_points_per_unit_length * edge_len))
-        sim_edges.append((int(edge.start_idx), int(edge.end_idx), int(num_points)))
+        sim_edges.append(
+            (
+                int(edge.start_idx),
+                int(edge.end_idx),
+                int(num_points),
+                float(edge.normal[0]),
+                float(edge.normal[1]),
+                float(edge.normal[2]),
+            )
+        )
     return sim_edges
 
 
@@ -390,7 +428,8 @@ def compute_sim_bounds_from_arcs(arcs: list[Arc]) -> tuple[float, float, float, 
 def write_simulation_html(
     html_path: Path,
     model_vertices: np.ndarray,
-    sim_edges: list[tuple[int, int, int]],
+    model_faces: np.ndarray,
+    sim_edges: list[tuple[int, int, int, float, float, float]],
     camera: CameraConfig,
     arcs: list[Arc],
     min_arc_radius: float,
@@ -404,6 +443,28 @@ def write_simulation_html(
     height = max(1, int(math.ceil((max_y - min_y) + 2.0 * padding)))
     offset_x = padding - min_x
     offset_y = padding - min_y
+
+    face_payload: list[list[float | int]] = []
+    for tri in model_faces:
+        i0, i1, i2 = int(tri[0]), int(tri[1]), int(tri[2])
+        p0 = model_vertices[i0]
+        p1 = model_vertices[i1]
+        p2 = model_vertices[i2]
+        n = np.cross(p1 - p0, p2 - p0)
+        n_len = float(np.linalg.norm(n))
+        if n_len < EPS:
+            continue
+        n = n / n_len
+        face_payload.append(
+            [
+                i0,
+                i1,
+                i2,
+                round(float(n[0]), 6),
+                round(float(n[1]), 6),
+                round(float(n[2]), 6),
+            ]
+        )
 
     payload = {
         "minArcRadius": float(min_arc_radius),
@@ -420,7 +481,10 @@ def write_simulation_html(
             [round(float(v[0]), 4), round(float(v[1]), 4), round(float(v[2]), 4)]
             for v in model_vertices
         ],
-        "edges": [[e[0], e[1], e[2]] for e in sim_edges],
+        "edges": [
+            [e[0], e[1], e[2], round(e[3], 6), round(e[4], 6), round(e[5], 6)] for e in sim_edges
+        ],
+        "faces": face_payload,
     }
     payload_json = json.dumps(payload, separators=(",", ":"))
 
@@ -453,6 +517,16 @@ def write_simulation_html(
         "      <strong id=\"camPitchValue\">0 deg</strong>\n"
         "      <label>Zoom: <input id=\"camZoom\" type=\"range\" min=\"60\" max=\"220\" step=\"1\" value=\"100\"/></label>\n"
         "      <strong id=\"camZoomValue\">100%</strong>\n"
+        "      <label>Mode:\n"
+        "        <select id=\"renderMode\">\n"
+        "          <option value=\"combined\" selected>Combined</option>\n"
+        "          <option value=\"pattern\">Pattern</option>\n"
+        "          <option value=\"wire\">Wireframe</option>\n"
+        "          <option value=\"opaque\">Opaque</option>\n"
+        "        </select>\n"
+        "      </label>\n"
+        "      <label>Light: <input id=\"lightAngle\" type=\"range\" min=\"-180\" max=\"180\" step=\"1\" value=\"30\"/></label>\n"
+        "      <strong id=\"lightAngleValue\">30 deg</strong>\n"
         "      <label>View gain: <input id=\"viewGain\" type=\"range\" min=\"10\" max=\"300\" step=\"5\" value=\"100\"/></label>\n"
         "      <strong id=\"viewGainValue\">1.0x</strong>\n"
         "      <label>Arc stride: <input id=\"arcStride\" type=\"range\" min=\"1\" max=\"12\" step=\"1\" value=\"4\"/></label>\n"
@@ -465,12 +539,14 @@ def write_simulation_html(
         "      <strong id=\"depthMixValue\">70%</strong>\n"
         "      <label>Thresh: <input id=\"thresh\" type=\"range\" min=\"0\" max=\"90\" step=\"1\" value=\"10\"/></label>\n"
         "      <strong id=\"threshValue\">10%</strong>\n"
+        "      <label>Model alpha: <input id=\"modelAlpha\" type=\"range\" min=\"5\" max=\"95\" step=\"1\" value=\"30\"/></label>\n"
+        "      <strong id=\"modelAlphaValue\">30%</strong>\n"
         "      <label>Arc alpha: <input id=\"arcAlpha\" type=\"range\" min=\"2\" max=\"80\" step=\"1\" value=\"20\"/></label>\n"
         "      <strong id=\"arcAlphaValue\">20%</strong>\n"
         "      <label><input id=\"showArcs\" type=\"checkbox\" checked/> Show arcs</label>\n"
         "      <label><input id=\"showWire\" type=\"checkbox\" checked/> Show simulated profile</label>\n"
         "    </div>\n"
-        "    <div class=\"small\">Camera orbit is 3D-projected. Depth sort is enabled for arcs (far to near).</div>\n"
+        "    <div class=\"small\">Camera orbit is 3D-projected. Pattern uses depth sort + light threshold.</div>\n"
         "    <div class=\"panel\">\n"
         f"      <canvas id=\"sim\" width=\"{width}\" height=\"{height}\"></canvas>\n"
         "    </div>\n"
@@ -487,6 +563,9 @@ def write_simulation_html(
         "    const camPitchValue = document.getElementById('camPitchValue');\n"
         "    const camZoom = document.getElementById('camZoom');\n"
         "    const camZoomValue = document.getElementById('camZoomValue');\n"
+        "    const renderMode = document.getElementById('renderMode');\n"
+        "    const lightAngle = document.getElementById('lightAngle');\n"
+        "    const lightAngleValue = document.getElementById('lightAngleValue');\n"
         "    const viewGain = document.getElementById('viewGain');\n"
         "    const viewGainValue = document.getElementById('viewGainValue');\n"
         "    const arcStride = document.getElementById('arcStride');\n"
@@ -499,6 +578,8 @@ def write_simulation_html(
         "    const depthMixValue = document.getElementById('depthMixValue');\n"
         "    const thresh = document.getElementById('thresh');\n"
         "    const threshValue = document.getElementById('threshValue');\n"
+        "    const modelAlpha = document.getElementById('modelAlpha');\n"
+        "    const modelAlphaValue = document.getElementById('modelAlphaValue');\n"
         "    const arcAlpha = document.getElementById('arcAlpha');\n"
         "    const arcAlphaValue = document.getElementById('arcAlphaValue');\n"
         "    const showArcs = document.getElementById('showArcs');\n"
@@ -506,12 +587,22 @@ def write_simulation_html(
         "    const baseCamera = data.camera;\n"
         "    const vAdd = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];\n"
         "    const vSub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];\n"
+        "    const vScale = (a,s) => [a[0]*s, a[1]*s, a[2]*s];\n"
         "    const vDot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];\n"
         "    const vCross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];\n"
         "    const vNorm = (a) => Math.sqrt(vDot(a,a));\n"
         "    const vNormalize = (a) => { const n = vNorm(a); return (n < 1e-12) ? [0,0,0] : [a[0]/n,a[1]/n,a[2]/n]; };\n"
+        "    const vClamp01 = (x) => Math.max(0.0, Math.min(1.0, x));\n"
+        "    function reflect(i, n) { const k = 2.0 * vDot(i, n); return [i[0]-k*n[0], i[1]-k*n[1], i[2]-k*n[2]]; }\n"
         "    function rotY(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [c*v[0]+s*v[2], v[1], -s*v[0]+c*v[2]]; }\n"
         "    function rotX(v, ang) { const c=Math.cos(ang), s=Math.sin(ang); return [v[0], c*v[1]-s*v[2], s*v[1]+c*v[2]]; }\n"
+        "    function buildLightDirection() {\n"
+        "      const az = Number(lightAngle.value) * Math.PI / 180.0;\n"
+        "      const elevation = 20.0 * Math.PI / 180.0;\n"
+        "      const c = Math.cos(elevation);\n"
+        "      const v = [Math.cos(az) * c, Math.sin(elevation), Math.sin(az) * c];\n"
+        "      return vNormalize(v);\n"
+        "    }\n"
         "    function buildCameraState() {\n"
         "      const yaw = Number(camYaw.value) * Math.PI / 180.0;\n"
         "      const pitch = Number(camPitch.value) * Math.PI / 180.0;\n"
@@ -576,12 +667,14 @@ def write_simulation_html(
         "      camYawValue.textContent = `${Number(camYaw.value).toFixed(0)} deg`;\n"
         "      camPitchValue.textContent = `${Number(camPitch.value).toFixed(0)} deg`;\n"
         "      camZoomValue.textContent = `${Number(camZoom.value).toFixed(0)}%`;\n"
+        "      lightAngleValue.textContent = `${Number(lightAngle.value).toFixed(0)} deg`;\n"
         "      viewGainValue.textContent = `${(Number(viewGain.value) / 100.0).toFixed(1)}x`;\n"
         "      arcStrideValue.textContent = `${Number(arcStride.value).toFixed(0)}`;\n"
         "      arcLimitValue.textContent = `${Number(arcLimit.value).toFixed(0)}`;\n"
         "      arcMinRValue.textContent = `${Number(arcMinR.value).toFixed(0)}`;\n"
         "      depthMixValue.textContent = `${Number(depthMix.value).toFixed(0)}%`;\n"
         "      threshValue.textContent = `${Number(thresh.value).toFixed(0)}%`;\n"
+        "      modelAlphaValue.textContent = `${Number(modelAlpha.value).toFixed(0)}%`;\n"
         "      arcAlphaValue.textContent = `${Number(arcAlpha.value).toFixed(0)}%`;\n"
         "      ctx.clearRect(0, 0, canvas.width, canvas.height);\n"
         "      const cam = buildCameraState();\n"
@@ -605,7 +698,49 @@ def write_simulation_html(
         "      const tx = (canvas.width / 2.0) - ((minX + maxX) / 2.0);\n"
         "      const ty = (canvas.height / 2.0) - ((minY + maxY) / 2.0);\n"
         "      const gain = Number(viewGain.value) / 100.0;\n"
-        "      if (showArcs.checked) {\n"
+        "      const lightDir = buildLightDirection();\n"
+        "      const mode = renderMode.value;\n"
+        "      const wantPattern = showArcs.checked && (mode === 'combined' || mode === 'pattern');\n"
+        "      const wantWire = showWire.checked && (mode === 'combined' || mode === 'wire');\n"
+        "      const wantOpaque = (mode === 'combined' || mode === 'opaque');\n"
+        "      if (wantOpaque && Array.isArray(data.faces) && data.faces.length > 0) {\n"
+        "        const tris = [];\n"
+        "        const mAlpha = Math.max(0.05, Number(modelAlpha.value) / 100.0);\n"
+        "        for (const f of data.faces) {\n"
+        "          const q0 = proj[f[0]];\n"
+        "          const q1 = proj[f[1]];\n"
+        "          const q2 = proj[f[2]];\n"
+        "          if (!q0 || !q1 || !q2) continue;\n"
+        "          let n = vNormalize([f[3], f[4], f[5]]);\n"
+        "          if (vNorm(n) < 1e-9) continue;\n"
+        "          const m0 = data.vertices[f[0]];\n"
+        "          const m1 = data.vertices[f[1]];\n"
+        "          const m2 = data.vertices[f[2]];\n"
+        "          const mc = [(m0[0] + m1[0] + m2[0]) / 3.0, (m0[1] + m1[1] + m2[1]) / 3.0, (m0[2] + m1[2] + m2[2]) / 3.0];\n"
+        "          const toEye = vNormalize(vSub(cam.po, mc));\n"
+        "          if (vDot(n, toEye) < 0.0) n = vScale(n, -1.0);\n"
+        "          const ndotl = Math.max(0.0, vDot(n, lightDir));\n"
+        "          const shade = 0.15 + 0.85 * ndotl;\n"
+        "          const z = (q0[2] + q1[2] + q2[2]) / 3.0;\n"
+        "          tris.push({ z, q0, q1, q2, shade, alpha: mAlpha });\n"
+        "        }\n"
+        "        tris.sort((a, b) => a.z - b.z);\n"
+        "        ctx.lineWidth = 0.6;\n"
+        "        for (const t of tris) {\n"
+        "          const c = Math.round(24 + 92 * t.shade);\n"
+        "          const b = Math.round(58 + 140 * t.shade);\n"
+        "          ctx.fillStyle = `rgba(${c},${c},${b},${t.alpha.toFixed(3)})`;\n"
+        "          ctx.strokeStyle = `rgba(210,225,255,${Math.min(0.80, t.alpha + 0.16).toFixed(3)})`;\n"
+        "          ctx.beginPath();\n"
+        "          ctx.moveTo(t.q0[0] + tx, t.q0[1] + ty);\n"
+        "          ctx.lineTo(t.q1[0] + tx, t.q1[1] + ty);\n"
+        "          ctx.lineTo(t.q2[0] + tx, t.q2[1] + ty);\n"
+        "          ctx.closePath();\n"
+        "          ctx.fill();\n"
+        "          ctx.stroke();\n"
+        "        }\n"
+        "      }\n"
+        "      if (wantPattern) {\n"
         "        const stride = Math.max(1, Number(arcStride.value));\n"
         "        const limit = Math.max(100, Number(arcLimit.value));\n"
         "        const minR = Math.max(0, Number(arcMinR.value));\n"
@@ -619,19 +754,33 @@ def write_simulation_html(
         "          const p0 = proj[e[0]];\n"
         "          const p1 = proj[e[1]];\n"
         "          if (!p0 || !p1) continue;\n"
+        "          const m0 = data.vertices[e[0]];\n"
+        "          const m1 = data.vertices[e[1]];\n"
+        "          const nEdgeBase = vNormalize([e[3], e[4], e[5]]);\n"
         "          const samples = Math.max(2, e[2]);\n"
         "          for (let k = 0; k < samples; k += stride) {\n"
         "            const t = (samples <= 1) ? 0.0 : (k / (samples - 1));\n"
-            "            const px = p0[0] + (p1[0] - p0[0]) * t;\n"
-            "            const py = p0[1] + (p1[1] - p0[1]) * t;\n"
-            "            const pz = p0[2] + (p1[2] - p0[2]) * t;\n"
+        "            const px = p0[0] + (p1[0] - p0[0]) * t;\n"
+        "            const py = p0[1] + (p1[1] - p0[1]) * t;\n"
+        "            const pz = p0[2] + (p1[2] - p0[2]) * t;\n"
+        "            const mx = m0[0] + (m1[0] - m0[0]) * t;\n"
+        "            const my = m0[1] + (m1[1] - m0[1]) * t;\n"
+        "            const mz = m0[2] + (m1[2] - m0[2]) * t;\n"
+        "            const pm = [mx, my, mz];\n"
+        "            const toEye = vNormalize(vSub(cam.po, pm));\n"
+        "            let nEdge = nEdgeBase;\n"
+        "            if (vDot(nEdge, toEye) < 0.0) nEdge = vScale(nEdge, -1.0);\n"
+        "            const ndotl = Math.max(0.0, vDot(nEdge, lightDir));\n"
+        "            const halfV = vNormalize(vAdd(lightDir, toEye));\n"
+        "            const spec = Math.pow(Math.max(0.0, vDot(nEdge, halfV)), 20.0);\n"
+        "            const lightScore = vClamp01(0.35 * ndotl + 0.90 * spec);\n"
         "            const dist = (pz - nView) * gain;\n"
-            "            const r = Math.abs(dist) / 2.0;\n"
+        "            const r = Math.abs(dist) / 2.0;\n"
         "            if (r < minR || r < data.minArcRadius * 0.25) continue;\n"
         "            const cx = px + tx;\n"
         "            const cy = (py - dist / 2.0) + ty;\n"
-            "            const start = (dist > 0) ? 0 : Math.PI;\n"
-        "            candidates.push({ z: pz, cx, cy, r, start });\n"
+        "            const start = (dist > 0) ? 0 : Math.PI;\n"
+        "            candidates.push({ z: pz, cx, cy, r, start, light: lightScore });\n"
         "            if (candidates.length >= sampleCap) break collectLoop;\n"
         "          }\n"
         "        }\n"
@@ -646,10 +795,14 @@ def write_simulation_html(
         "          for (const c of candidates) {\n"
         "            const depthNorm = (c.z - zMin) / zSpan;\n"
         "            if (depthNorm < depthGate) continue;\n"
-        "            const gated = (depthNorm - depthGate) / depthDen;\n"
-        "            if (gated < threshold) continue;\n"
-        "            const a = Math.max(0.01, Math.min(1.0, baseAlpha * (0.15 + 0.85 * gated)));\n"
-        "            ctx.strokeStyle = `rgba(190,190,190,${a.toFixed(3)})`;\n"
+        "            const depthScore = vClamp01((depthNorm - depthGate) / depthDen);\n"
+        "            const score = depthScore * c.light;\n"
+        "            if (score < threshold) continue;\n"
+        "            const a = Math.max(0.01, Math.min(1.0, baseAlpha * (0.12 + 0.88 * score)));\n"
+        "            const rr = Math.round(130 + 90 * c.light);\n"
+        "            const gg = Math.round(165 + 80 * c.light);\n"
+        "            const bb = Math.round(70 + 60 * (1.0 - c.light));\n"
+        "            ctx.strokeStyle = `rgba(${rr},${gg},${bb},${a.toFixed(3)})`;\n"
         "            ctx.beginPath();\n"
         "            ctx.arc(c.cx, c.cy, c.r, c.start, c.start + Math.PI, false);\n"
         "            ctx.stroke();\n"
@@ -658,7 +811,7 @@ def write_simulation_html(
         "          }\n"
         "        }\n"
         "      }\n"
-        "      if (showWire.checked) {\n"
+        "      if (wantWire) {\n"
         "        ctx.strokeStyle = 'rgba(245,245,245,0.92)';\n"
         "        ctx.lineWidth = 1.5;\n"
         "        for (const edge of data.edges) {\n"
@@ -678,12 +831,15 @@ def write_simulation_html(
         "    camYaw.addEventListener('input', draw);\n"
         "    camPitch.addEventListener('input', draw);\n"
         "    camZoom.addEventListener('input', draw);\n"
+        "    renderMode.addEventListener('change', draw);\n"
+        "    lightAngle.addEventListener('input', draw);\n"
         "    viewGain.addEventListener('input', draw);\n"
         "    arcStride.addEventListener('input', draw);\n"
         "    arcLimit.addEventListener('input', draw);\n"
         "    arcMinR.addEventListener('input', draw);\n"
         "    depthMix.addEventListener('input', draw);\n"
         "    thresh.addEventListener('input', draw);\n"
+        "    modelAlpha.addEventListener('input', draw);\n"
         "    arcAlpha.addEventListener('input', draw);\n"
         "    showArcs.addEventListener('change', draw);\n"
         "    showWire.addEventListener('change', draw);\n"
@@ -878,7 +1034,7 @@ def run(args: argparse.Namespace) -> int:
     )
 
     mesh = load_mesh(args.stl)
-    model_vertices, edges = build_model_vertices_and_edges(
+    model_vertices, edges, model_faces = build_model_vertices_and_edges(
         mesh=mesh,
         auto_center=pipeline.auto_center,
         decimals=NORMAL_TOLERANCE_DECIMALS,
@@ -910,6 +1066,7 @@ def run(args: argparse.Namespace) -> int:
         write_simulation_html(
             html_path=args.simulate_html,
             model_vertices=model_vertices,
+            model_faces=model_faces,
             sim_edges=sim_edges,
             camera=camera,
             arcs=arcs,

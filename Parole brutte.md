@@ -73,10 +73,57 @@ Now I've downloaded a thorus and tried with a cube but it seems like there are s
 Hard to manipulate the object and to learn how to use the program
 
 
+-------------------------PARTE NUOVA IN PYTHON --------------
+
+Obiettivo implementato:
+
+Pipeline riproducibile da STL a traiettorie scratch in SVG, con simulazione interattiva del risultato.
+Fase 1, import e preprocessing mesh:
+
+Caricamento STL con trimesh.
+Pulizia mesh (facce degeneri/duplicate, vertici non referenziati).
+Rounding coordinate per stabilità numerica.
+Auto-centering su asse Z (stile HoloZens).
+Costruzione vertici unici, edge unici e facce rimappate.
+Fase 2, estrazione geometria utile agli scratch:
+
+Edge extraction con adiacenze di faccia.
+Filtro coplanare (equivalente a “merge faces”) per rimuovere diagonali da triangolazione.
+Calcolo normal per-edge (media normali facce adiacenti), utile per simulazione ottica.
+Fase 3, modello di proiezione e generazione archi:
+
+Implementazione matrice model -> view -> perspective -> window.
+Campionamento punti lungo gli edge in base a line-resolution.
+Costruzione archi semicircolari in 2D tramite profondità rispetto al piano vista.
+Dedupe geometrico e filtro su raggio minimo (min-arc-radius) per eliminare micro-archi.
+Export SVG con path ad archi (traiettorie incisione).
+Fase 4, debug ed export dati:
+
+Export JSON con parametri camera/pipeline e statistiche (edges_count, arcs_count).
+Fase 5, simulazione interattiva HTML:
+
+Slider View angle per simulazione visuale dell’effetto.
+Camera orbit 3D (yaw, pitch, zoom) con proiezione corretta.
+Controlli pattern (arc stride, arc limit, arc alpha, arc min r, view gain).
+Fase 6, miglioramenti stile HoloCraft:
+
+Depth sort reale degli archi (ordinamento per profondità).
+Slider Depth e Thresh per selezione contributi visivi utili.
+Nuovo Light slider e scoring luce (componente diffuse/specular semplificata).
+Modalità render: Combined, Pattern, Wireframe, Opaque.
+Pass Opaque con shading facce depth-sorted e alpha controllabile (Model alpha).
+Test eseguiti:
+
+basic_cube_-_10mm.stl: edge e archi coerenti con attese HoloZens-like.
+trefoil.stl: pipeline stabile anche su mesh complesse (migliaia di edge e archi).
+Risultato pratico:
+
+Hai ora un generatore robusto STL -> SVG e una preview parametrica molto più vicina al comportamento dei tool competitor, mantenendo stack semplice e controllabile.
 
 
 
 
+------------------------------
 
 
 
