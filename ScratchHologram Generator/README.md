@@ -1,24 +1,21 @@
 # ScratchHologram Generator
 
-Generatore Python di archi tipo HoloZens a partire da file STL.
+Generatore Python di archi tipo HoloZens/HoloCraft a partire da file STL.
 
-Questa versione produce **solo archi** (niente linee/profili), con una pipeline edge-based:
+Il progetto include:
+- pipeline CLI per `STL -> SVG` (opzionale HTML/JSON),
+- app desktop lanciabile con preview archi single-view + export SVG.
 
-1. Carica STL.
-2. Estrae vertici e spigoli unici.
-3. Applica camera/proiezione in stile HoloZens.
-4. Campiona punti lungo ogni spigolo (line resolution).
-5. Converte ogni punto in arco 180°.
-6. Esporta SVG (opzionale JSON debug).
+## File principali
 
-## File inclusi
-
-- `scratch_pipeline.py`: script principale arc-based.
+- `scratch_pipeline.py`: pipeline e rendering/simulazione.
+- `scratch_desktop_app.py`: applicazione desktop interattiva.
 - `requirements.txt`: dipendenze Python.
 
 ## Requisiti
 
 - Python 3.10+ (testato con Python 3.14).
+- `tkinter` (incluso di default su Windows Python standard).
 
 ## Setup (PowerShell)
 
@@ -28,37 +25,40 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## Test richiesto (basic cube)
+## Avvio App Desktop
+
+```powershell
+.\.venv\Scripts\python.exe .\scratch_desktop_app.py
+```
+
+Nell'app puoi:
+1. caricare STL (`Apri STL`);
+2. ruotare la camera direttamente sulla preview archi (drag) e zoomare con rotellina;
+3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, ecc.);
+4. esportare lo SVG della vista corrente (`Esporta SVG`).
+
+## Uso CLI (pipeline)
 
 ```powershell
 .\.venv\Scripts\python.exe .\scratch_pipeline.py `
   --stl "..\knots\basic_cube_-_10mm.stl" `
   --svg ".\out\basic_cube_holozens_arcs.svg" `
-  --simulate-html ".\out\basic_cube_simulation.html" `
+  --simulate-html ".\out\basic_cube_simulation_cam.html" `
   --json ".\out\basic_cube_holozens_arcs.json" `
   --line-resolution 3.28 `
-  --min-arc-radius 6
+  --min-arc-radius 6 `
+  --stroke-width 0.15
 ```
 
-## Parametri principali
+## Parametri chiave
 
-- `--line-resolution`: punti per unità di lunghezza spigolo.
-- `--min-arc-radius`: filtra gli archi troppo piccoli (utile per pulire il risultato).
-- `--canvas-width`, `--canvas-height`: dimensione canvas camera.
-- `--po`, `--pr`, `--look-up`, `--zf`, `--current-scale`: parametri camera.
-- `--stroke-width`: spessore arco nello SVG (solo visualizzazione, non incisione fisica).
-- `--no-auto-center`: disabilita l'allineamento Z automatico del modello.
+- `line-resolution`: densita` di campionamento lungo gli spigoli.
+- `min-arc-radius`: filtro anti micro-archi.
+- `stroke-width`: spessore visuale arco in SVG.
+- camera (`po`, `pr`, `look-up`, `zf`, `current-scale`) per la proiezione.
 
 ## Output
 
 - SVG con soli path ad arco (`M ... A ...`).
-- HTML interattivo opzionale con slider `View angle` + controlli camera 3D (`yaw`, `pitch`, `zoom`) e filtri archi (`stride`, `limit`, `alpha`).
-- JSON opzionale con:
-  - configurazione camera/pipeline;
-  - numero archi/spigoli;
-  - parametri geometrici di ogni arco.
-
-## Note
-
-- Obiettivo: comportamento vicino a HoloZens lato geometria archi.
-- Non include ancora GUI, linee/profili o export G-code.
+- HTML opzionale con simulazione interattiva e controlli luce/profondita`.
+- JSON opzionale con dati di debug/statistiche.
