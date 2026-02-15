@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import numpy as np
 
@@ -40,34 +40,16 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def point_at_angle_projected(
-    p: np.ndarray | tuple[float, float, float],
-    angle_deg: float,
-    n_view: float,
-    gain: float,
-) -> tuple[float, float]:
-    dist = (float(p[2]) - n_view) * gain
-    cx = float(p[0])
-    cy = float(p[1]) - dist / 2.0
-    oy = dist / 2.0
-    t = math.radians(angle_deg)
-    x = cx - oy * math.sin(t)
-    y = cy + oy * math.cos(t)
-    return x, y
-
-
-def point_on_arc_for_view_angle(arc: Arc, angle_deg: float) -> tuple[float, float]:
+def point_on_arc_compatible(arc: Arc, angle_deg: float) -> tuple[float, float]:
     """
-    Compute a point on the exact canvas arc geometry for a given view angle.
-
-    Mapping:
-    - view angle in [-90, 90] maps to sweep fraction [0, 1]
-    - theta is interpreted with Tk canvas convention:
-      x = cx + r*cos(theta), y = cy - r*sin(theta)
+    Compute a point on the rendered arc using the same angular parameterization
+    that proved visually consistent in preview:
+    u in [0,1] -> theta in [start_angle, start_angle + sweep_angle].
     """
-    r = arc.rect_w / 2.0
-    cx = arc.rect_x + r
-    cy = arc.rect_y + r
+    base_r = arc.rect_w / 2.0
+    r = max(0.1, base_r)
+    cx = arc.rect_x + base_r
+    cy = arc.rect_y + base_r
 
     u = (clamp(angle_deg, -90.0, 90.0) + 90.0) / 180.0
     theta_deg = arc.start_angle + (u * arc.sweep_angle)
@@ -76,6 +58,132 @@ def point_on_arc_for_view_angle(arc: Arc, angle_deg: float) -> tuple[float, floa
     x = cx + r * math.cos(theta)
     y = cy - r * math.sin(theta)
     return x, y
+
+
+def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float, float]]:
+    radius = max(float(arc.rect_w) / 2.0, 0.5)
+    cx = float(arc.rect_x) + radius
+    cy = float(arc.rect_y) + radius
+
+    sweep = float(arc.sweep_angle)
+    if abs(sweep) < EPS:
+        sweep = 180.0
+
+    arc_len = abs(math.radians(sweep)) * radius
+    seg_len = max(float(max_segment_units), 0.05)
+    seg_count = max(8, int(math.ceil(arc_len / seg_len)))
+
+    points: list[tuple[float, float]] = []
+    for i in range(seg_count + 1):
+        t = i / seg_count
+        theta_deg = float(arc.start_angle) + (sweep * t)
+        theta = math.radians(theta_deg)
+        x = cx + radius * math.cos(theta)
+        y = cy + radius * math.sin(theta)
+        points.append((x, y))
+    return points
+
+
+def write_gcode(
+    gcode_path: Path,
+    arcs: list[Arc],
+    target_width_mm: float,
+    safe_z_mm: float,
+    cut_z_mm: float,
+    feed_xy_mm_min: float,
+    feed_z_mm_min: float,
+    max_segment_mm: float,
+    spindle_rpm: int,
+    invert_y: bool,
+) -> tuple[int, int, float]:
+    if len(arcs) == 0:
+        raise ValueError("Nessun arco disponibile per esportare G-code.")
+    if target_width_mm <= 0.0:
+        raise ValueError("target_width_mm deve essere > 0.")
+    if feed_xy_mm_min <= 0.0 or feed_z_mm_min <= 0.0:
+        raise ValueError("I feedrate devono essere > 0.")
+    if max_segment_mm <= 0.0:
+        raise ValueError("max_segment_mm deve essere > 0.")
+
+    min_x_u = min(float(a.rect_x) for a in arcs)
+    max_x_u = max(float(a.rect_x + a.rect_w) for a in arcs)
+    width_u = max(max_x_u - min_x_u, EPS)
+    mm_per_unit = target_width_mm / width_u
+
+    max_segment_units = max_segment_mm / mm_per_unit
+    raw_paths = [sample_arc_polyline(arc, max_segment_units=max_segment_units) for arc in arcs]
+
+    all_points = [pt for path in raw_paths for pt in path]
+    if len(all_points) == 0:
+        raise ValueError("Campionamento archi vuoto.")
+
+    y_max_u = max(p[1] for p in all_points)
+    scaled_paths: list[list[tuple[float, float]]] = []
+    for path in raw_paths:
+        scaled_path: list[tuple[float, float]] = []
+        for x_u, y_u in path:
+            y_src = (y_max_u - y_u) if invert_y else y_u
+            x_mm = x_u * mm_per_unit
+            y_mm = y_src * mm_per_unit
+            scaled_path.append((x_mm, y_mm))
+        if len(scaled_path) >= 2:
+            scaled_paths.append(scaled_path)
+
+    all_scaled = [pt for path in scaled_paths for pt in path]
+    min_x_mm = min(p[0] for p in all_scaled)
+    min_y_mm = min(p[1] for p in all_scaled)
+
+    translated_paths: list[list[tuple[float, float]]] = []
+    total_cut_length = 0.0
+    for path in scaled_paths:
+        out_path: list[tuple[float, float]] = []
+        prev = None
+        for x_mm, y_mm in path:
+            p = (x_mm - min_x_mm, y_mm - min_y_mm)
+            out_path.append(p)
+            if prev is not None:
+                total_cut_length += math.hypot(p[0] - prev[0], p[1] - prev[1])
+            prev = p
+        translated_paths.append(out_path)
+
+    gcode_lines = [
+        "; ScratchHologram Generator - G-code",
+        "G21 ; millimeters",
+        "G90 ; absolute coordinates",
+        "G17 ; XY plane",
+        "G94 ; units/min feed",
+        f"G0 Z{safe_z_mm:.4f}",
+    ]
+    if spindle_rpm > 0:
+        gcode_lines.append(f"M3 S{int(spindle_rpm)}")
+
+    segment_count = 0
+    for path in translated_paths:
+        if len(path) < 2:
+            continue
+        sx, sy = path[0]
+        gcode_lines.append(f"G0 X{sx:.4f} Y{sy:.4f}")
+        gcode_lines.append(f"G1 Z{cut_z_mm:.4f} F{feed_z_mm_min:.2f}")
+        gcode_lines.append(f"G1 X{sx:.4f} Y{sy:.4f} F{feed_xy_mm_min:.2f}")
+        for x, y in path[1:]:
+            gcode_lines.append(f"G1 X{x:.4f} Y{y:.4f}")
+            segment_count += 1
+        gcode_lines.append(f"G0 Z{safe_z_mm:.4f}")
+
+    if spindle_rpm > 0:
+        gcode_lines.append("M5")
+    gcode_lines.extend(
+        [
+            "G0 X0.0000 Y0.0000",
+            f"G0 Z{safe_z_mm:.4f}",
+            "M2",
+            "",
+        ]
+    )
+
+    gcode_path.parent.mkdir(parents=True, exist_ok=True)
+    gcode_path.write_text("\n".join(gcode_lines), encoding="utf-8")
+    return len(translated_paths), segment_count, total_cut_length
 
 
 class ScratchDesktopApp:
@@ -118,10 +226,18 @@ class ScratchDesktopApp:
         self.arc_limit = tk.IntVar(value=6000)
         self.preview_quality = tk.IntVar(value=55)
         self.view_angle = tk.DoubleVar(value=0.0)
-        self.view_gain = tk.DoubleVar(value=1.0)
         self.show_arcs = tk.BooleanVar(value=True)
         self.show_profile = tk.BooleanVar(value=True)
         self.auto_center = tk.BooleanVar(value=True)
+
+        self.gcode_target_width_mm = 10.0
+        self.gcode_safe_z_mm = 3.0
+        self.gcode_cut_z_mm = -0.08
+        self.gcode_feed_xy_mm_min = 700.0
+        self.gcode_feed_z_mm_min = 220.0
+        self.gcode_max_segment_mm = 0.20
+        self.gcode_spindle_rpm = 12000
+        self.gcode_invert_y = True
 
         self.status_var = tk.StringVar(value="Apri un file STL per iniziare.")
 
@@ -133,6 +249,7 @@ class ScratchDesktopApp:
 
         ttk.Button(top, text="Apri STL", command=self.open_stl_dialog).pack(side=tk.LEFT)
         ttk.Button(top, text="Esporta SVG", command=self.export_svg_dialog).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(top, text="Esporta G-code", command=self.export_gcode_dialog).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(top, text="Ricalcola", command=lambda: self.recompute_and_redraw(interactive=False)).pack(
             side=tk.LEFT, padx=(8, 0)
         )
@@ -240,18 +357,6 @@ class ScratchDesktopApp:
             fmt="{:.0f} deg",
             redraw_only=True,
         )
-        self._make_slider(
-            controls,
-            row=2,
-            col=2,
-            label="View gain",
-            variable=self.view_gain,
-            min_val=0.2,
-            max_val=4.0,
-            fmt="{:.2f}x",
-            redraw_only=True,
-        )
-
         ttk.Checkbutton(
             controls,
             text="Show arcs",
@@ -363,6 +468,7 @@ class ScratchDesktopApp:
         diag = float(np.linalg.norm(v_max - v_min))
         self.base_orbit_radius = max(10.0, diag * 2.6)
         self.distance_scale = 1.0
+        self.gcode_target_width_mm = max(1.0, float(max(v_max[0] - v_min[0], v_max[1] - v_min[1])))
 
         lengths = []
         for edge in self.edges:
@@ -647,7 +753,6 @@ class ScratchDesktopApp:
 
         if self.show_profile.get():
             angle = float(self.view_angle.get())
-            gain = float(self.view_gain.get())
 
             if interactive:
                 path_stride = 2
@@ -663,7 +768,7 @@ class ScratchDesktopApp:
 
                 coords: list[float] = []
                 for arc in arcs:
-                    x, y = point_on_arc_for_view_angle(arc, angle)
+                    x, y = point_on_arc_compatible(arc, angle)
                     coords.append(x)
                     coords.append(y)
 
@@ -699,30 +804,136 @@ class ScratchDesktopApp:
         _, _, _, draw_limit = self._preview_params(interactive=False, full_quality=False)
         self._draw_scene(draw_limit=draw_limit, interactive=self.dragging)
 
-    def export_svg_dialog(self) -> None:
-        if self.model_vertices is None or self.stl_path is None:
-            messagebox.showwarning("Nessun modello", "Carica prima un file STL.")
-            return
+    def _compute_full_view_arcs(self) -> list[Arc]:
+        if self.model_vertices is None:
+            raise ValueError("Nessun modello caricato.")
 
         w = max(20, int(self.canvas.winfo_width()))
         h = max(20, int(self.canvas.winfo_height()))
         camera = self._build_camera(w, h)
 
-        try:
-            mtx = build_model_to_window_matrix(camera)
-            zero_vertices = model_to_window(self.model_vertices, mtx)
-            pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), mtx)[0]
-            n_view = float(pr_view[2])
+        mtx = build_model_to_window_matrix(camera)
+        zero_vertices = model_to_window(self.model_vertices, mtx)
+        pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), mtx)[0]
+        n_view = float(pr_view[2])
 
-            arcs_full = generate_arcs(
-                model_vertices=self.model_vertices,
-                zero_vertices=zero_vertices,
-                edges=self.edges,
-                view_points_per_unit_length=float(self.line_resolution.get()),
-                n_view=n_view,
-                dedupe_decimals=6,
-                min_arc_radius=float(self.min_arc_radius.get()),
-            )
+        arcs_full = generate_arcs(
+            model_vertices=self.model_vertices,
+            zero_vertices=zero_vertices,
+            edges=self.edges,
+            view_points_per_unit_length=float(self.line_resolution.get()),
+            n_view=n_view,
+            dedupe_decimals=6,
+            min_arc_radius=float(self.min_arc_radius.get()),
+        )
+        return arcs_full
+
+    def _prompt_gcode_settings(self) -> dict[str, float | int | bool] | None:
+        parent = self.root
+
+        target_width_mm = simpledialog.askfloat(
+            "G-code: scala",
+            "Larghezza finale incisione (mm):",
+            parent=parent,
+            initialvalue=float(self.gcode_target_width_mm),
+            minvalue=0.1,
+        )
+        if target_width_mm is None:
+            return None
+
+        safe_z_mm = simpledialog.askfloat(
+            "G-code: sicurezza",
+            "Quota Z di sicurezza (mm):",
+            parent=parent,
+            initialvalue=float(self.gcode_safe_z_mm),
+        )
+        if safe_z_mm is None:
+            return None
+
+        cut_z_mm = simpledialog.askfloat(
+            "G-code: incisione",
+            "Quota Z di incisione (mm):",
+            parent=parent,
+            initialvalue=float(self.gcode_cut_z_mm),
+        )
+        if cut_z_mm is None:
+            return None
+
+        feed_xy_mm_min = simpledialog.askfloat(
+            "G-code: feed XY",
+            "Feed XY (mm/min):",
+            parent=parent,
+            initialvalue=float(self.gcode_feed_xy_mm_min),
+            minvalue=1.0,
+        )
+        if feed_xy_mm_min is None:
+            return None
+
+        feed_z_mm_min = simpledialog.askfloat(
+            "G-code: feed Z",
+            "Feed Z (mm/min):",
+            parent=parent,
+            initialvalue=float(self.gcode_feed_z_mm_min),
+            minvalue=1.0,
+        )
+        if feed_z_mm_min is None:
+            return None
+
+        max_segment_mm = simpledialog.askfloat(
+            "G-code: segmentazione",
+            "Lunghezza massima segmento (mm):",
+            parent=parent,
+            initialvalue=float(self.gcode_max_segment_mm),
+            minvalue=0.01,
+        )
+        if max_segment_mm is None:
+            return None
+
+        spindle_rpm = simpledialog.askinteger(
+            "G-code: mandrino",
+            "RPM mandrino (0 = non emettere M3/M5):",
+            parent=parent,
+            initialvalue=int(self.gcode_spindle_rpm),
+            minvalue=0,
+        )
+        if spindle_rpm is None:
+            return None
+
+        invert_y = messagebox.askyesnocancel(
+            "G-code: asse Y",
+            "Invertire asse Y nel G-code?\n(SI consigliato su CNC con Y verso l'alto)",
+            parent=parent,
+        )
+        if invert_y is None:
+            return None
+
+        self.gcode_target_width_mm = float(target_width_mm)
+        self.gcode_safe_z_mm = float(safe_z_mm)
+        self.gcode_cut_z_mm = float(cut_z_mm)
+        self.gcode_feed_xy_mm_min = float(feed_xy_mm_min)
+        self.gcode_feed_z_mm_min = float(feed_z_mm_min)
+        self.gcode_max_segment_mm = float(max_segment_mm)
+        self.gcode_spindle_rpm = int(spindle_rpm)
+        self.gcode_invert_y = bool(invert_y)
+
+        return {
+            "target_width_mm": float(target_width_mm),
+            "safe_z_mm": float(safe_z_mm),
+            "cut_z_mm": float(cut_z_mm),
+            "feed_xy_mm_min": float(feed_xy_mm_min),
+            "feed_z_mm_min": float(feed_z_mm_min),
+            "max_segment_mm": float(max_segment_mm),
+            "spindle_rpm": int(spindle_rpm),
+            "invert_y": bool(invert_y),
+        }
+
+    def export_svg_dialog(self) -> None:
+        if self.model_vertices is None or self.stl_path is None:
+            messagebox.showwarning("Nessun modello", "Carica prima un file STL.")
+            return
+
+        try:
+            arcs_full = self._compute_full_view_arcs()
         except Exception as exc:
             messagebox.showerror("Errore export SVG", str(exc))
             return
@@ -744,6 +955,65 @@ class ScratchDesktopApp:
             return
 
         self.status_var.set(f"SVG esportato: {save_path} | Archi full: {len(arcs_full)}")
+
+    def export_gcode_dialog(self) -> None:
+        if self.model_vertices is None or self.stl_path is None:
+            messagebox.showwarning("Nessun modello", "Carica prima un file STL.")
+            return
+
+        try:
+            arcs_full = self._compute_full_view_arcs()
+        except Exception as exc:
+            messagebox.showerror("Errore calcolo archi", str(exc))
+            return
+
+        if len(arcs_full) == 0:
+            messagebox.showwarning("Nessun arco", "Con i parametri attuali non ci sono archi da esportare.")
+            return
+
+        params = self._prompt_gcode_settings()
+        if params is None:
+            return
+
+        default_name = f"{self.stl_path.stem}_arcs.nc"
+        save_path = filedialog.asksaveasfilename(
+            title="Esporta G-code",
+            defaultextension=".nc",
+            initialfile=default_name,
+            filetypes=[
+                ("G-code", "*.nc"),
+                ("G-code", "*.gcode"),
+                ("Text", "*.txt"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not save_path:
+            return
+
+        try:
+            path_count, segment_count, cut_length = write_gcode(
+                gcode_path=Path(save_path),
+                arcs=arcs_full,
+                target_width_mm=float(params["target_width_mm"]),
+                safe_z_mm=float(params["safe_z_mm"]),
+                cut_z_mm=float(params["cut_z_mm"]),
+                feed_xy_mm_min=float(params["feed_xy_mm_min"]),
+                feed_z_mm_min=float(params["feed_z_mm_min"]),
+                max_segment_mm=float(params["max_segment_mm"]),
+                spindle_rpm=int(params["spindle_rpm"]),
+                invert_y=bool(params["invert_y"]),
+            )
+        except Exception as exc:
+            messagebox.showerror("Errore export G-code", str(exc))
+            return
+
+        self.status_var.set(
+            (
+                f"G-code esportato: {save_path} | Archi: {len(arcs_full)} | "
+                f"Path: {path_count} | Segmenti: {segment_count} | "
+                f"Lunghezza taglio: {cut_length:.2f} mm"
+            )
+        )
 
 
 def main() -> int:

@@ -4,7 +4,7 @@ Generatore Python di archi tipo HoloZens/HoloCraft a partire da file STL.
 
 Il progetto include:
 - pipeline CLI per `STL -> SVG` (opzionale HTML/JSON),
-- app desktop lanciabile con preview archi single-view + export SVG.
+- app desktop lanciabile con preview archi single-view + export SVG/G-code.
 
 ## File principali
 
@@ -34,8 +34,15 @@ python -m venv .venv
 Nell'app puoi:
 1. caricare STL (`Apri STL`);
 2. ruotare la camera direttamente sulla preview archi (drag) e zoomare con rotellina;
-3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, view angle/view gain, ecc.);
-4. esportare lo SVG della vista corrente (`Esporta SVG`).
+3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, view angle, ecc.);
+4. esportare lo SVG della vista corrente (`Esporta SVG`);
+5. esportare il G-code (`Esporta G-code`) con dialog parametri:
+   - larghezza finale in mm,
+   - quota Z sicurezza/incisione,
+   - feed XY / Z,
+   - segmentazione massima,
+   - RPM mandrino opzionale (0 disabilita `M3/M5`),
+   - inversione asse Y opzionale.
 
 Note preview:
 - `Preview quality` influenza davvero dettaglio e velocita` (campionamento edge + line resolution effettiva).
@@ -65,5 +72,10 @@ Note preview:
 ## Output
 
 - SVG con soli path ad arco (`M ... A ...`).
+- G-code (`.nc/.gcode`) con:
+  - `G21`, `G90`, `G17`, `G94`,
+  - movimenti rapidi `G0`,
+  - incisione `G1` (arco discretizzato in segmenti lineari),
+  - opzionale `M3/M5`.
 - HTML opzionale con simulazione interattiva e controlli luce/profondita`.
 - JSON opzionale con dati di debug/statistiche.
