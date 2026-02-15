@@ -229,6 +229,8 @@ class ScratchDesktopApp:
         self.show_arcs = tk.BooleanVar(value=True)
         self.show_profile = tk.BooleanVar(value=True)
         self.auto_center = tk.BooleanVar(value=True)
+        self.export_occlusion_cull = tk.BooleanVar(value=True)
+        self.export_cull_strength = tk.IntVar(value=45)
 
         self.gcode_target_width_mm = 10.0
         self.gcode_safe_z_mm = 3.0
@@ -375,6 +377,23 @@ class ScratchDesktopApp:
             variable=self.auto_center,
             command=self.on_auto_center_toggle,
         ).grid(row=3, column=2, padx=8, pady=4, sticky="w")
+        ttk.Checkbutton(
+            controls,
+            text="Cull hidden arcs on export",
+            variable=self.export_occlusion_cull,
+        ).grid(row=4, column=0, padx=8, pady=2, sticky="w")
+        self._make_slider(
+            controls,
+            row=4,
+            col=1,
+            label="Cull strength",
+            variable=self.export_cull_strength,
+            min_val=0,
+            max_val=100,
+            fmt="{:.0f}%",
+            integer=True,
+            redraw_only=True,
+        )
 
         status = ttk.Label(self.root, textvariable=self.status_var, padding=(10, 2), anchor="w")
         status.pack(side=tk.BOTTOM, fill=tk.X)
@@ -804,7 +823,7 @@ class ScratchDesktopApp:
         _, _, _, draw_limit = self._preview_params(interactive=False, full_quality=False)
         self._draw_scene(draw_limit=draw_limit, interactive=self.dragging)
 
-    def _compute_full_view_arcs(self) -> list[Arc]:
+    def _compute_full_view_data(self) -> tuple[list[Arc], np.ndarray]:
         if self.model_vertices is None:
             raise ValueError("Nessun modello caricato.")
 
@@ -826,7 +845,138 @@ class ScratchDesktopApp:
             dedupe_decimals=6,
             min_arc_radius=float(self.min_arc_radius.get()),
         )
-        return arcs_full
+        return arcs_full, zero_vertices
+
+    def _filter_occluded_arcs(self, arcs: list[Arc], projected_vertices: np.ndarray) -> list[Arc]:
+        if len(arcs) == 0:
+            return arcs
+        if self.faces is None or len(self.faces) == 0:
+            return arcs
+
+        try:
+            strength = clamp(float(self.export_cull_strength.get()) / 100.0, 0.0, 1.0)
+        except Exception:
+            strength = 1.0
+
+        # Screen-space acceleration grid over projected triangles.
+        cell = 24.0
+        tri_data: list[tuple[float, ...]] = []
+        grid: dict[tuple[int, int], list[int]] = {}
+
+        for tri in self.faces:
+            i0, i1, i2 = int(tri[0]), int(tri[1]), int(tri[2])
+            p0 = projected_vertices[i0]
+            p1 = projected_vertices[i1]
+            p2 = projected_vertices[i2]
+
+            if not (
+                np.isfinite(p0[0]) and np.isfinite(p0[1]) and np.isfinite(p0[2]) and
+                np.isfinite(p1[0]) and np.isfinite(p1[1]) and np.isfinite(p1[2]) and
+                np.isfinite(p2[0]) and np.isfinite(p2[1]) and np.isfinite(p2[2])
+            ):
+                continue
+
+            x0, y0, z0 = float(p0[0]), float(p0[1]), float(p0[2])
+            x1, y1, z1 = float(p1[0]), float(p1[1]), float(p1[2])
+            x2, y2, z2 = float(p2[0]), float(p2[1]), float(p2[2])
+
+            denom = ((y1 - y2) * (x0 - x2)) + ((x2 - x1) * (y0 - y2))
+            if abs(denom) < EPS:
+                continue
+
+            min_x = min(x0, x1, x2)
+            max_x = max(x0, x1, x2)
+            min_y = min(y0, y1, y2)
+            max_y = max(y0, y1, y2)
+
+            tri_idx = len(tri_data)
+            tri_data.append((x0, y0, z0, x1, y1, z1, x2, y2, z2, denom, min_x, max_x, min_y, max_y))
+
+            ix0 = int(math.floor(min_x / cell))
+            ix1 = int(math.floor(max_x / cell))
+            iy0 = int(math.floor(min_y / cell))
+            iy1 = int(math.floor(max_y / cell))
+            for ix in range(ix0, ix1 + 1):
+                for iy in range(iy0, iy1 + 1):
+                    key = (ix, iy)
+                    if key in grid:
+                        grid[key].append(tri_idx)
+                    else:
+                        grid[key] = [tri_idx]
+
+        if len(tri_data) == 0:
+            return arcs
+
+        z_vals = projected_vertices[:, 2]
+        z_span = float(np.max(z_vals) - np.min(z_vals)) if projected_vertices.shape[0] > 0 else 1.0
+        z_eps = max(0.003 * z_span, 0.45)
+        inside_tol = 0.0
+
+        kept: list[Arc] = []
+        for arc in arcs:
+            x = float(arc.zero_coord[0])
+            y = float(arc.zero_coord[1])
+            z = float(arc.zero_coord[2])
+            ix = int(math.floor(x / cell))
+            iy = int(math.floor(y / cell))
+
+            candidate: list[int] = []
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    candidate.extend(grid.get((ix + dx, iy + dy), []))
+
+            if len(candidate) == 0:
+                kept.append(arc)
+                continue
+
+            z_front = -1.0e30
+            z_cover: list[float] = []
+            seen: set[int] = set()
+            for tri_idx in candidate:
+                if tri_idx in seen:
+                    continue
+                seen.add(tri_idx)
+                x0, y0, z0, x1, y1, z1, x2, y2, z2, denom, min_x, max_x, min_y, max_y = tri_data[tri_idx]
+                if x < (min_x - 0.2) or x > (max_x + 0.2) or y < (min_y - 0.2) or y > (max_y + 0.2):
+                    continue
+
+                a = ((y1 - y2) * (x - x2)) + ((x2 - x1) * (y - y2))
+                b = ((y2 - y0) * (x - x2)) + ((x0 - x2) * (y - y2))
+                a /= denom
+                b /= denom
+                c = 1.0 - a - b
+                if a < inside_tol or b < inside_tol or c < inside_tol:
+                    continue
+
+                z_surf = (a * z0) + (b * z1) + (c * z2)
+                z_cover.append(z_surf)
+                if z_surf > z_front:
+                    z_front = z_surf
+
+            # Conservative depth culling:
+            # low strength keeps more arcs (especially in dense/self-occluded meshes).
+            adaptive_margin = z_eps + ((1.0 - strength) * (0.55 * float(arc.rect_w) + 2.0))
+            if strength >= 0.80:
+                required_hits = 1
+            elif strength >= 0.45:
+                required_hits = 2
+            else:
+                required_hits = 3
+
+            hit_threshold = z + (0.35 * adaptive_margin)
+            occluding_hits = 0
+            for zs in z_cover:
+                if zs > hit_threshold:
+                    occluding_hits += 1
+                    if occluding_hits >= required_hits:
+                        break
+
+            if z_front <= -1.0e29 or z >= (z_front - adaptive_margin) or occluding_hits < required_hits:
+                kept.append(arc)
+
+        if len(kept) == 0:
+            return arcs
+        return kept
 
     def _prompt_gcode_settings(self) -> dict[str, float | int | bool] | None:
         parent = self.root
@@ -933,10 +1083,15 @@ class ScratchDesktopApp:
             return
 
         try:
-            arcs_full = self._compute_full_view_arcs()
+            arcs_full, projected_vertices = self._compute_full_view_data()
         except Exception as exc:
             messagebox.showerror("Errore export SVG", str(exc))
             return
+
+        if self.export_occlusion_cull.get():
+            arcs_export = self._filter_occluded_arcs(arcs_full, projected_vertices)
+        else:
+            arcs_export = arcs_full
 
         default_name = f"{self.stl_path.stem}_arcs.svg"
         save_path = filedialog.asksaveasfilename(
@@ -949,12 +1104,17 @@ class ScratchDesktopApp:
             return
 
         try:
-            write_svg(Path(save_path), arcs_full, stroke_width=float(self.stroke_width.get()))
+            write_svg(Path(save_path), arcs_export, stroke_width=float(self.stroke_width.get()))
         except Exception as exc:
             messagebox.showerror("Errore scrittura SVG", str(exc))
             return
 
-        self.status_var.set(f"SVG esportato: {save_path} | Archi full: {len(arcs_full)}")
+        self.status_var.set(
+            (
+                f"SVG esportato: {save_path} | Archi visibili: {len(arcs_export)}"
+                f"/{len(arcs_full)}"
+            )
+        )
 
     def export_gcode_dialog(self) -> None:
         if self.model_vertices is None or self.stl_path is None:
@@ -962,12 +1122,17 @@ class ScratchDesktopApp:
             return
 
         try:
-            arcs_full = self._compute_full_view_arcs()
+            arcs_full, projected_vertices = self._compute_full_view_data()
         except Exception as exc:
             messagebox.showerror("Errore calcolo archi", str(exc))
             return
 
-        if len(arcs_full) == 0:
+        if self.export_occlusion_cull.get():
+            arcs_export = self._filter_occluded_arcs(arcs_full, projected_vertices)
+        else:
+            arcs_export = arcs_full
+
+        if len(arcs_export) == 0:
             messagebox.showwarning("Nessun arco", "Con i parametri attuali non ci sono archi da esportare.")
             return
 
@@ -993,7 +1158,7 @@ class ScratchDesktopApp:
         try:
             path_count, segment_count, cut_length = write_gcode(
                 gcode_path=Path(save_path),
-                arcs=arcs_full,
+                arcs=arcs_export,
                 target_width_mm=float(params["target_width_mm"]),
                 safe_z_mm=float(params["safe_z_mm"]),
                 cut_z_mm=float(params["cut_z_mm"]),
@@ -1009,7 +1174,8 @@ class ScratchDesktopApp:
 
         self.status_var.set(
             (
-                f"G-code esportato: {save_path} | Archi: {len(arcs_full)} | "
+                f"G-code esportato: {save_path} | Archi visibili: {len(arcs_export)}"
+                f"/{len(arcs_full)} | "
                 f"Path: {path_count} | Segmenti: {segment_count} | "
                 f"Lunghezza taglio: {cut_length:.2f} mm"
             )

@@ -43,6 +43,8 @@ Nell'app puoi:
    - segmentazione massima,
    - RPM mandrino opzionale (0 disabilita `M3/M5`),
    - inversione asse Y opzionale.
+6. opzionale `Cull hidden arcs on export` per rimuovere archi occlusi (dietro superfici in primo piano) in SVG/G-code.
+   - usa `Cull strength` per regolare quanto e` aggressivo il filtro (`20-50%` consigliato su modelli complessi).
 
 Note preview:
 - `Preview quality` influenza davvero dettaglio e velocita` (campionamento edge + line resolution effettiva).
