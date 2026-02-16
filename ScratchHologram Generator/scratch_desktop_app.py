@@ -40,6 +40,21 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def point_at_angle_projected(
+    p: np.ndarray | tuple[float, float, float],
+    angle_deg: float,
+    n_view: float,
+) -> tuple[float, float]:
+    dist = float(p[2]) - n_view
+    cx = float(p[0])
+    cy = float(p[1]) - dist / 2.0
+    oy = dist / 2.0
+    t = math.radians(angle_deg)
+    x = cx - oy * math.sin(t)
+    y = cy + oy * math.cos(t)
+    return x, y
+
+
 def point_on_arc_compatible(arc: Arc, angle_deg: float) -> tuple[float, float]:
     """
     Compute a point on the rendered arc using the same angular parameterization
@@ -79,7 +94,8 @@ def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float,
         theta_deg = float(arc.start_angle) + (sweep * t)
         theta = math.radians(theta_deg)
         x = cx + radius * math.cos(theta)
-        y = cy + radius * math.sin(theta)
+        # Match Tk canvas arc orientation used in preview.
+        y = cy - radius * math.sin(theta)
         points.append((x, y))
     return points
 
@@ -201,6 +217,7 @@ class ScratchDesktopApp:
 
         self.current_arcs: list[Arc] = []
         self.profile_paths: list[list[Arc]] = []
+        self.last_sampled_edges: list[Edge] = []
         self.last_projected: np.ndarray | None = None
         self.last_n_view: float = 0.0
         self.last_edge_stride: int = 1
@@ -228,9 +245,11 @@ class ScratchDesktopApp:
         self.view_angle = tk.DoubleVar(value=0.0)
         self.show_arcs = tk.BooleanVar(value=True)
         self.show_profile = tk.BooleanVar(value=True)
+        self.rigid_profile = tk.BooleanVar(value=True)
         self.auto_center = tk.BooleanVar(value=True)
-        self.export_occlusion_cull = tk.BooleanVar(value=True)
+        self.export_occlusion_cull = tk.BooleanVar(value=False)
         self.export_cull_strength = tk.IntVar(value=45)
+        self.export_use_preview = tk.BooleanVar(value=True)
 
         self.gcode_target_width_mm = 10.0
         self.gcode_safe_z_mm = 3.0
@@ -322,7 +341,7 @@ class ScratchDesktopApp:
             label="Perspective zf",
             variable=self.zf,
             min_val=5.0,
-            max_val=80.0,
+            max_val=100.0,
             fmt="{:.1f}",
         )
         self._make_slider(
@@ -394,6 +413,17 @@ class ScratchDesktopApp:
             integer=True,
             redraw_only=True,
         )
+        ttk.Checkbutton(
+            controls,
+            text="Export exactly preview",
+            variable=self.export_use_preview,
+        ).grid(row=4, column=2, padx=8, pady=2, sticky="w")
+        ttk.Checkbutton(
+            controls,
+            text="Rigid simulation",
+            variable=self.rigid_profile,
+            command=self.redraw_from_cache,
+        ).grid(row=5, column=1, padx=8, pady=2, sticky="w")
 
         status = ttk.Label(self.root, textvariable=self.status_var, padding=(10, 2), anchor="w")
         status.pack(side=tk.BOTTOM, fill=tk.X)
@@ -653,7 +683,7 @@ class ScratchDesktopApp:
             )
 
             arc_path: list[Arc] = []
-            prev_hash: tuple[int, int, int, int, float] | None = None
+            prev_hash: tuple[float, float, float, float, float] | None = None
             for p in points:
                 key = self._coord_key(p, decimals=6)
                 arc = arc_by_coord.get(key)
@@ -662,10 +692,10 @@ class ScratchDesktopApp:
 
                 # Collapse consecutive duplicates (same rendered arc geometry).
                 arc_hash = (
-                    arc.rect_x,
-                    arc.rect_y,
-                    arc.rect_w,
-                    arc.rect_h,
+                    round(float(arc.rect_x), 4),
+                    round(float(arc.rect_y), 4),
+                    round(float(arc.rect_w), 4),
+                    round(float(arc.rect_h), 4),
                     arc.start_angle,
                 )
                 if prev_hash is not None and arc_hash == prev_hash:
@@ -712,6 +742,7 @@ class ScratchDesktopApp:
             interactive=interactive,
             full_quality=False,
         )
+        self.last_sampled_edges = sampled_edges
         self.last_edge_stride = stride
         self.last_preview_lr = effective_lr
         self.last_mode = "FAST" if interactive else "PREVIEW"
@@ -772,6 +803,7 @@ class ScratchDesktopApp:
 
         if self.show_profile.get():
             angle = float(self.view_angle.get())
+            rigid = bool(self.rigid_profile.get())
 
             if interactive:
                 path_stride = 2
@@ -780,23 +812,39 @@ class ScratchDesktopApp:
                 path_stride = 1
                 point_stride = 1
 
-            for path in self.profile_paths[::path_stride]:
-                arcs = path[::point_stride]
-                if len(arcs) < 2:
-                    continue
-
-                coords: list[float] = []
-                for arc in arcs:
-                    x, y = point_on_arc_compatible(arc, angle)
-                    coords.append(x)
-                    coords.append(y)
-
-                if len(coords) >= 4:
+            if rigid and self.last_projected is not None:
+                edges_to_draw = self.last_sampled_edges[::path_stride] if self.last_sampled_edges else self.edges[::path_stride]
+                for edge in edges_to_draw:
+                    p1 = self.last_projected[edge.start_idx]
+                    p2 = self.last_projected[edge.end_idx]
+                    x1, y1 = point_at_angle_projected(p1, angle, self.last_n_view)
+                    x2, y2 = point_at_angle_projected(p2, angle, self.last_n_view)
                     self.canvas.create_line(
-                        *coords,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
                         fill="#f4f4f4",
                         width=1.25,
                     )
+            else:
+                for path in self.profile_paths[::path_stride]:
+                    arcs = path[::point_stride]
+                    if len(arcs) < 2:
+                        continue
+
+                    coords: list[float] = []
+                    for arc in arcs:
+                        x, y = point_on_arc_compatible(arc, angle)
+                        coords.append(x)
+                        coords.append(y)
+
+                    if len(coords) >= 4:
+                        self.canvas.create_line(
+                            *coords,
+                            fill="#f4f4f4",
+                            width=1.25,
+                        )
 
         if self.stl_path is not None:
             self.status_var.set(
@@ -810,6 +858,7 @@ class ScratchDesktopApp:
                         f"LR eff: {self.last_preview_lr:.2f}",
                         f"Edge step: {self.last_edge_stride}",
                         f"Paths: {len(self.profile_paths)}",
+                        f"Sim: {'RIGID' if self.rigid_profile.get() else 'LEGACY'}",
                         f"Mode: {self.last_mode}",
                         f"Yaw/Pitch: {self.yaw_deg:.1f}/{self.pitch_deg:.1f}",
                     ]
@@ -846,6 +895,25 @@ class ScratchDesktopApp:
             min_arc_radius=float(self.min_arc_radius.get()),
         )
         return arcs_full, zero_vertices
+
+    def _compute_export_view_data(self) -> tuple[list[Arc], np.ndarray, str]:
+        """
+        Returns arcs + projected vertices for export and the source label:
+        - "preview": export uses the same arc dataset currently previewed
+        - "full": export recomputes full-resolution arcs
+        """
+        if self.model_vertices is None:
+            raise ValueError("Nessun modello caricato.")
+
+        if self.export_use_preview.get():
+            if self.last_mode == "FAST":
+                # Ensure export never uses temporary low-quality drag state.
+                self.recompute_and_redraw(interactive=False)
+            if self.last_projected is not None and len(self.current_arcs) > 0:
+                return list(self.current_arcs), self.last_projected, "preview"
+
+        arcs_full, projected_vertices = self._compute_full_view_data()
+        return arcs_full, projected_vertices, "full"
 
     def _filter_occluded_arcs(self, arcs: list[Arc], projected_vertices: np.ndarray) -> list[Arc]:
         if len(arcs) == 0:
@@ -1083,7 +1151,7 @@ class ScratchDesktopApp:
             return
 
         try:
-            arcs_full, projected_vertices = self._compute_full_view_data()
+            arcs_full, projected_vertices, source = self._compute_export_view_data()
         except Exception as exc:
             messagebox.showerror("Errore export SVG", str(exc))
             return
@@ -1112,7 +1180,7 @@ class ScratchDesktopApp:
         self.status_var.set(
             (
                 f"SVG esportato: {save_path} | Archi visibili: {len(arcs_export)}"
-                f"/{len(arcs_full)}"
+                f"/{len(arcs_full)} | Source: {source.upper()}"
             )
         )
 
@@ -1122,7 +1190,7 @@ class ScratchDesktopApp:
             return
 
         try:
-            arcs_full, projected_vertices = self._compute_full_view_data()
+            arcs_full, projected_vertices, source = self._compute_export_view_data()
         except Exception as exc:
             messagebox.showerror("Errore calcolo archi", str(exc))
             return
@@ -1177,7 +1245,7 @@ class ScratchDesktopApp:
                 f"G-code esportato: {save_path} | Archi visibili: {len(arcs_export)}"
                 f"/{len(arcs_full)} | "
                 f"Path: {path_count} | Segmenti: {segment_count} | "
-                f"Lunghezza taglio: {cut_length:.2f} mm"
+                f"Lunghezza taglio: {cut_length:.2f} mm | Source: {source.upper()}"
             )
         )
 

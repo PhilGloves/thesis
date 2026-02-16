@@ -45,11 +45,19 @@ Nell'app puoi:
    - inversione asse Y opzionale.
 6. opzionale `Cull hidden arcs on export` per rimuovere archi occlusi (dietro superfici in primo piano) in SVG/G-code.
    - usa `Cull strength` per regolare quanto e` aggressivo il filtro (`20-50%` consigliato su modelli complessi).
+7. `Export exactly preview` per esportare lo stesso dataset di archi attualmente in preview (evita differenze preview/export).
+
+Nota coerenza preview/export:
+- con `Export exactly preview` attivo e `Cull hidden arcs on export` disattivo, export e preview risultano 1:1 lato geometria;
+- se il culling export e` attivo, l'export rimuove archi nascosti e quindi differira` dalla preview non-cullata.
 
 Note preview:
 - `Preview quality` influenza davvero dettaglio e velocita` (campionamento edge + line resolution effettiva).
 - durante il drag la preview passa in modalita` `FAST` per ridurre il lag.
 - `View angle` + `Show simulated profile` simulano il movimento osservato nello scratch hologram.
+- `Rigid simulation`:
+  - ON: profilo simulato rigido (coerenza geometrica 3D migliore, consigliato per cubo/forme semplici).
+  - OFF: simulazione legacy che segue i punti sugli archi.
 
 ## Uso CLI (pipeline)
 

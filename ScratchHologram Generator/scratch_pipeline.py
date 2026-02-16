@@ -62,10 +62,10 @@ class Edge:
 class Arc:
     edge_id: int
     zero_coord: tuple[float, float, float]
-    rect_x: int
-    rect_y: int
-    rect_w: int
-    rect_h: int
+    rect_x: float
+    rect_y: float
+    rect_w: float
+    rect_h: float
     start_angle: float
     sweep_angle: float
 
@@ -292,15 +292,15 @@ def model_to_window(points_xyz: np.ndarray, model_to_window_mtx: np.ndarray) -> 
     return transformed[:, 0:3]
 
 
-def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[int, int, int, int]:
+def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float, float, float]:
     distance_from_canvas = float(point_zero[2] - n_view)
     center_x = float(point_zero[0])
     center_y = float(point_zero[1] - distance_from_canvas / 2.0)
     halfwidth = abs(center_y - float(point_zero[1]))
 
-    length = max(int(halfwidth * 2.0 + 0.5), 1)
-    rect_x = int(center_x - halfwidth + 0.5)
-    rect_y = int(center_y - halfwidth + 0.5)
+    length = max(halfwidth * 2.0, 1.0)
+    rect_x = center_x - halfwidth
+    rect_y = center_y - halfwidth
     return rect_x, rect_y, length, length
 
 
@@ -327,8 +327,9 @@ def generate_arcs(
     min_arc_radius: float,
 ) -> list[Arc]:
     seen_coords: set[str] = set()
-    seen_arc_geom: set[tuple[int, int, int, int, int]] = set()
+    seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
     arcs: list[Arc] = []
+    geom_decimals = max(3, dedupe_decimals - 2)
 
     for edge in edges:
         model_start = model_vertices[edge.start_idx]
@@ -360,7 +361,13 @@ def generate_arcs(
                 continue
 
             start_angle = 0.0 if (float(point[2]) - n_view) > 0.0 else 180.0
-            arc_hash = (rect_x, rect_y, rect_w, rect_h, int(start_angle))
+            arc_hash = (
+                round(rect_x, geom_decimals),
+                round(rect_y, geom_decimals),
+                round(rect_w, geom_decimals),
+                round(rect_h, geom_decimals),
+                int(start_angle),
+            )
             if arc_hash in seen_arc_geom:
                 continue
             seen_arc_geom.add(arc_hash)
@@ -879,10 +886,12 @@ def write_svg(svg_path: Path, arcs: list[Arc], stroke_width: float) -> None:
         max_x = max(max_x, x1, x2)
         max_y = max(max_y, y1, y2)
         path_cmds.append(f"M {x1:.6f} {y1:.6f}")
-        path_cmds.append(f"A {r:.6f} {r:.6f} 0 0 1 {x2:.6f} {y2:.6f}")
+        # Keep arc orientation consistent with Tk canvas preview:
+        # for our semicircles the exported sweep must be CCW (sweep-flag 0).
+        path_cmds.append(f"A {r:.6f} {r:.6f} 0 0 0 {x2:.6f} {y2:.6f}")
 
-    width = int(max_x)
-    height = int(max_y)
+    width = int(math.ceil(max_x)) + 1
+    height = int(math.ceil(max_y)) + 1
 
     rows: list[str] = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -930,7 +939,7 @@ def write_debug_json(
                     "Y": arc.zero_coord[1],
                     "Z": arc.zero_coord[2],
                 },
-                "ArcRect": f"{arc.rect_x}, {arc.rect_y}, {arc.rect_w}, {arc.rect_h}",
+                "ArcRect": f"{arc.rect_x:.6f}, {arc.rect_y:.6f}, {arc.rect_w:.6f}, {arc.rect_h:.6f}",
                 "StartAngle": arc.start_angle,
                 "SweepAngle": arc.sweep_angle,
             }
