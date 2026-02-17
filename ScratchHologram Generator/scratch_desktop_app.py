@@ -121,6 +121,7 @@ def write_gcode(
     max_segment_mm: float,
     spindle_rpm: int,
     invert_y: bool,
+    arc_mode: str,
 ) -> tuple[int, int, float]:
     if len(arcs) == 0:
         raise ValueError("Nessun arco disponibile per esportare G-code.")
@@ -160,17 +161,16 @@ def write_gcode(
     min_y_mm = min(p[1] for p in all_scaled)
 
     translated_paths: list[list[tuple[float, float]]] = []
-    total_cut_length = 0.0
     for path in scaled_paths:
         out_path: list[tuple[float, float]] = []
-        prev = None
         for x_mm, y_mm in path:
             p = (x_mm - min_x_mm, y_mm - min_y_mm)
             out_path.append(p)
-            if prev is not None:
-                total_cut_length += math.hypot(p[0] - prev[0], p[1] - prev[1])
-            prev = p
         translated_paths.append(out_path)
+
+    def to_mm_xy(x_u: float, y_u: float) -> tuple[float, float]:
+        y_src = (y_max_u - y_u) if invert_y else y_u
+        return (x_u * mm_per_unit) - min_x_mm, (y_src * mm_per_unit) - min_y_mm
 
     gcode_lines = [
         "; ScratchHologram Generator - G-code",
@@ -183,18 +183,62 @@ def write_gcode(
     if spindle_rpm > 0:
         gcode_lines.append(f"M3 S{int(spindle_rpm)}")
 
+    mode = str(arc_mode).strip().lower()
+    use_circular_commands = mode == "semi"
+
     segment_count = 0
-    for path in translated_paths:
+    path_count = 0
+    total_cut_length = 0.0
+    for arc, path in zip(arcs, translated_paths):
         if len(path) < 2:
             continue
+
+        rx_u = max(float(arc.rect_w) / 2.0, 0.0)
+        ry_u = max(float(arc.rect_h) / 2.0, 0.0)
+        near_circle = abs(rx_u - ry_u) <= max(1.0e-6, 1.0e-3 * max(rx_u, ry_u, 1.0))
+
+        if use_circular_commands and near_circle:
+            cx_u = float(arc.rect_x) + rx_u
+            cy_u = float(arc.rect_y) + ry_u
+            start_rad = math.radians(float(arc.start_angle))
+            end_rad = math.radians(float(arc.start_angle) + float(arc.sweep_angle))
+
+            sx_u = cx_u + rx_u * math.cos(start_rad)
+            sy_u = cy_u - ry_u * math.sin(start_rad)
+            ex_u = cx_u + rx_u * math.cos(end_rad)
+            ey_u = cy_u - ry_u * math.sin(end_rad)
+
+            sx, sy = to_mm_xy(sx_u, sy_u)
+            ex, ey = to_mm_xy(ex_u, ey_u)
+            cx, cy = to_mm_xy(cx_u, cy_u)
+
+            ccw = float(arc.sweep_angle) >= 0.0
+            if not invert_y:
+                ccw = not ccw
+            cmd = "G3" if ccw else "G2"
+
+            gcode_lines.append(f"G0 X{sx:.4f} Y{sy:.4f}")
+            gcode_lines.append(f"G1 Z{cut_z_mm:.4f} F{feed_z_mm_min:.2f}")
+            gcode_lines.append(f"{cmd} X{ex:.4f} Y{ey:.4f} I{(cx - sx):.4f} J{(cy - sy):.4f} F{feed_xy_mm_min:.2f}")
+            gcode_lines.append(f"G0 Z{safe_z_mm:.4f}")
+
+            total_cut_length += abs(math.radians(float(arc.sweep_angle))) * (rx_u * mm_per_unit)
+            segment_count += 1
+            path_count += 1
+            continue
+
         sx, sy = path[0]
         gcode_lines.append(f"G0 X{sx:.4f} Y{sy:.4f}")
         gcode_lines.append(f"G1 Z{cut_z_mm:.4f} F{feed_z_mm_min:.2f}")
         gcode_lines.append(f"G1 X{sx:.4f} Y{sy:.4f} F{feed_xy_mm_min:.2f}")
+        prev = path[0]
         for x, y in path[1:]:
             gcode_lines.append(f"G1 X{x:.4f} Y{y:.4f}")
+            total_cut_length += math.hypot(x - prev[0], y - prev[1])
+            prev = (x, y)
             segment_count += 1
         gcode_lines.append(f"G0 Z{safe_z_mm:.4f}")
+        path_count += 1
 
     if spindle_rpm > 0:
         gcode_lines.append("M5")
@@ -209,7 +253,7 @@ def write_gcode(
 
     gcode_path.parent.mkdir(parents=True, exist_ok=True)
     gcode_path.write_text("\n".join(gcode_lines), encoding="utf-8")
-    return len(translated_paths), segment_count, total_cut_length
+    return path_count, segment_count, total_cut_length
 
 
 class ScratchDesktopApp:
@@ -1328,6 +1372,7 @@ class ScratchDesktopApp:
                 max_segment_mm=float(params["max_segment_mm"]),
                 spindle_rpm=int(params["spindle_rpm"]),
                 invert_y=bool(params["invert_y"]),
+                arc_mode=self._current_arc_mode(),
             )
         except Exception as exc:
             messagebox.showerror("Errore export G-code", str(exc))

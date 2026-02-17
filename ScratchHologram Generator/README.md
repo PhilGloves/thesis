@@ -90,7 +90,9 @@ Note preview:
 - G-code (`.nc/.gcode`) con:
   - `G21`, `G90`, `G17`, `G94`,
   - movimenti rapidi `G0`,
-  - incisione `G1` (arco discretizzato in segmenti lineari),
+  - incisione:
+    - `Semicircle (CNC)`: archi con `G2/G3`,
+    - `Elliptic`: segmentazione lineare con `G1`,
   - opzionale `M3/M5`.
 - HTML opzionale con simulazione interattiva e controlli luce/profondita`.
 - JSON opzionale con dati di debug/statistiche.
