@@ -13,6 +13,8 @@ What this app does:
 from __future__ import annotations
 
 import math
+import subprocess
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -325,6 +327,7 @@ class ScratchDesktopApp:
         top.pack(side=tk.TOP, fill=tk.X)
 
         ttk.Button(top, text="Apri STL", command=self.open_stl_dialog).pack(side=tk.LEFT)
+        ttk.Button(top, text="Preview GPU", command=self.open_gpu_preview).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(top, text="Esporta SVG", command=self.export_svg_dialog).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(top, text="Esporta G-code", command=self.export_gcode_dialog).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(top, text="Ricalcola", command=lambda: self.recompute_and_redraw(interactive=False)).pack(
@@ -606,6 +609,21 @@ class ScratchDesktopApp:
         )
         if filename:
             self.load_stl(Path(filename))
+
+    def open_gpu_preview(self) -> None:
+        script = Path(__file__).resolve().parent / "scratch_gpu_preview.py"
+        if not script.exists():
+            messagebox.showerror("GPU preview", f"File mancante: {script}")
+            return
+
+        cmd = [sys.executable, str(script)]
+        if self.stl_path is not None:
+            cmd.extend(["--stl", str(self.stl_path)])
+
+        try:
+            subprocess.Popen(cmd, cwd=str(script.parent))
+        except Exception as exc:
+            messagebox.showerror("GPU preview", f"Errore avvio preview GPU:\n{exc}")
 
     def load_stl(self, stl_path: Path) -> None:
         try:

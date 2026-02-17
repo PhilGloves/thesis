@@ -1,3 +1,13 @@
+### ABSTRACT
+Gli scratch hologram rappresentano una tecnica di olografia analogica che consente di ottenere l’illusione di profondità tridimensionale attraverso l’incisione di micro-traiettorie su superfici riflettenti. La progettazione di tali strutture richiede la trasformazione di informazioni geometriche tridimensionali in percorsi di incisione compatibili con sistemi di fabbricazione digitale.
+
+Questa tesi presenta una pipeline software per la generazione di scratch hologram a partire da modelli tridimensionali in formato STL, finalizzata alla generazione di traiettorie di incisione su superfici riflettenti. L’approccio adottato, implementato in Python, integra il caricamento della mesh, l’estrazione e il campionamento degli spigoli, la proiezione sul piano 2D e la generazione di archi secondo un modello geometrico semplificato di riflessione speculare.
+
+Il sistema produce output in formato SVG e G-code, in funzione della geometria delle traiettorie generate. È stata inoltre sviluppata un’applicazione desktop per la preview interattiva e la regolazione dei parametri principali, garantendo coerenza tra simulazione ed esportazione.
+
+Il contributo del lavoro consiste nello sviluppo di una soluzione riproducibile e indipendente da strumenti proprietari, concepita come base estendibile per l’ottimizzazione dei percorsi CNC, la validazione sperimentale e future applicazioni nella fabbricazione di scratch hologram.
+
+
 ### Cos’è uno scratch / specular hologram
 Uno scratch hologram è una tecnica di rappresentazione tridimensionale analogica che utilizza micro-incisioni su una superficie riflettente per simulare la presenza di punti nello spazio. A differenza dell’olografia classica basata su interferenza laser, gli scratch hologram sfruttano la riflessione speculare della luce.
 Ogni graffio inciso sulla superficie agisce come un micro-specchio. Se orientato correttamente, esso riflette la luce verso l’osservatore in modo tale da simulare la provenienza della luce da un punto virtuale nello spazio tridimensionale. L’insieme coordinato di molti graffi consente quindi di ricostruire una forma tridimensionale percepita.

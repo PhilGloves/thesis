@@ -16,6 +16,7 @@ Il progetto include:
 
 - Python 3.10+ (testato con Python 3.14).
 - `tkinter` (incluso di default su Windows Python standard).
+- Per preview GPU: `PyQt6`, `pyqtgraph`, `PyOpenGL` (installati via `requirements.txt`).
 
 ## Setup (PowerShell)
 
@@ -30,6 +31,22 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\python.exe .\scratch_desktop_app.py
 ```
+
+## Avvio Preview GPU
+
+Puoi avviare la preview GPU in due modi:
+
+1. Dall'app desktop tramite il pulsante `Preview GPU`.
+2. Direttamente da terminale:
+
+```powershell
+.\.venv\Scripts\python.exe .\scratch_gpu_preview.py --stl "..\knots\basic_cube_-_10mm.stl"
+```
+
+Note preview GPU:
+- rendering OpenGL (molto piu` fluido su modelli densi rispetto a `tk.Canvas`);
+- usa lo stesso motore di generazione archi (line resolution, arc mode, ellipse ratio, view angle);
+- export SVG dalla vista corrente.
 
 Nell'app puoi:
 1. caricare STL (`Apri STL`);
