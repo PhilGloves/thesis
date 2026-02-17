@@ -44,14 +44,22 @@ def point_at_angle_projected(
     p: np.ndarray | tuple[float, float, float],
     angle_deg: float,
     n_view: float,
+    ellipse_ratio: float = 1.0,
 ) -> tuple[float, float]:
     dist = float(p[2]) - n_view
     cx = float(p[0])
     cy = float(p[1]) - dist / 2.0
-    oy = dist / 2.0
-    t = math.radians(angle_deg)
-    x = cx - oy * math.sin(t)
-    y = cy + oy * math.cos(t)
+    r = abs(dist) / 2.0
+    if r < EPS:
+        return cx, cy
+
+    # Match preview arc parameterization: angle [-90,+90] -> theta on [start, start+180].
+    u = (clamp(angle_deg, -90.0, 90.0) + 90.0) / 180.0
+    start_deg = 0.0 if dist > 0.0 else 180.0
+    theta = math.radians(start_deg + (u * 180.0))
+    ry = r * clamp(float(ellipse_ratio), 0.20, 1.00)
+    x = cx + r * math.cos(theta)
+    y = cy - ry * math.sin(theta)
     return x, y
 
 
@@ -61,30 +69,32 @@ def point_on_arc_compatible(arc: Arc, angle_deg: float) -> tuple[float, float]:
     that proved visually consistent in preview:
     u in [0,1] -> theta in [start_angle, start_angle + sweep_angle].
     """
-    base_r = arc.rect_w / 2.0
-    r = max(0.1, base_r)
-    cx = arc.rect_x + base_r
-    cy = arc.rect_y + base_r
+    rx = max(0.1, float(arc.rect_w) / 2.0)
+    ry = max(0.1, float(arc.rect_h) / 2.0)
+    cx = float(arc.rect_x) + (float(arc.rect_w) / 2.0)
+    cy = float(arc.rect_y) + (float(arc.rect_h) / 2.0)
 
     u = (clamp(angle_deg, -90.0, 90.0) + 90.0) / 180.0
     theta_deg = arc.start_angle + (u * arc.sweep_angle)
     theta = math.radians(theta_deg)
 
-    x = cx + r * math.cos(theta)
-    y = cy - r * math.sin(theta)
+    x = cx + rx * math.cos(theta)
+    y = cy - ry * math.sin(theta)
     return x, y
 
 
 def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float, float]]:
-    radius = max(float(arc.rect_w) / 2.0, 0.5)
-    cx = float(arc.rect_x) + radius
-    cy = float(arc.rect_y) + radius
+    rx = max(float(arc.rect_w) / 2.0, 0.5)
+    ry = max(float(arc.rect_h) / 2.0, 0.5)
+    cx = float(arc.rect_x) + (float(arc.rect_w) / 2.0)
+    cy = float(arc.rect_y) + (float(arc.rect_h) / 2.0)
 
     sweep = float(arc.sweep_angle)
     if abs(sweep) < EPS:
         sweep = 180.0
 
-    arc_len = abs(math.radians(sweep)) * radius
+    mean_radius = math.sqrt(((rx * rx) + (ry * ry)) / 2.0)
+    arc_len = abs(math.radians(sweep)) * mean_radius
     seg_len = max(float(max_segment_units), 0.05)
     seg_count = max(8, int(math.ceil(arc_len / seg_len)))
 
@@ -93,9 +103,9 @@ def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float,
         t = i / seg_count
         theta_deg = float(arc.start_angle) + (sweep * t)
         theta = math.radians(theta_deg)
-        x = cx + radius * math.cos(theta)
+        x = cx + rx * math.cos(theta)
         # Match Tk canvas arc orientation used in preview.
-        y = cy - radius * math.sin(theta)
+        y = cy - ry * math.sin(theta)
         points.append((x, y))
     return points
 
@@ -243,6 +253,8 @@ class ScratchDesktopApp:
         self.arc_limit = tk.IntVar(value=6000)
         self.preview_quality = tk.IntVar(value=55)
         self.view_angle = tk.DoubleVar(value=0.0)
+        self.arc_mode = tk.StringVar(value="Semicircle (CNC)")
+        self.ellipse_ratio = tk.DoubleVar(value=0.65)
         self.show_arcs = tk.BooleanVar(value=True)
         self.show_profile = tk.BooleanVar(value=True)
         self.rigid_profile = tk.BooleanVar(value=True)
@@ -378,6 +390,24 @@ class ScratchDesktopApp:
             fmt="{:.0f} deg",
             redraw_only=True,
         )
+        self._make_dropdown(
+            controls,
+            row=5,
+            col=0,
+            label="Arc mode",
+            variable=self.arc_mode,
+            values=("Semicircle (CNC)", "Elliptic"),
+        )
+        self._make_slider(
+            controls,
+            row=5,
+            col=2,
+            label="Ellipse ratio",
+            variable=self.ellipse_ratio,
+            min_val=0.20,
+            max_val=1.00,
+            fmt="{:.2f}",
+        )
         ttk.Checkbutton(
             controls,
             text="Show arcs",
@@ -474,10 +504,51 @@ class ScratchDesktopApp:
         )
         scale.pack(fill=tk.X, expand=True, side=tk.LEFT, padx=(0, 8))
 
+    def _make_dropdown(
+        self,
+        parent: ttk.Frame,
+        row: int,
+        col: int,
+        label: str,
+        variable: tk.StringVar,
+        values: tuple[str, ...],
+        redraw_only: bool = False,
+    ) -> None:
+        frame = ttk.Frame(parent)
+        frame.grid(row=row, column=col, padx=8, pady=4, sticky="ew")
+        parent.columnconfigure(col, weight=1)
+
+        ttk.Label(frame, text=label).pack(anchor="w")
+        combo = ttk.Combobox(
+            frame,
+            textvariable=variable,
+            values=values,
+            state="readonly",
+        )
+        combo.pack(fill=tk.X, expand=True)
+
+        def on_change(_: tk.Event) -> None:
+            if redraw_only:
+                self.redraw_from_cache()
+            else:
+                self.schedule_recompute(delay_ms=100)
+
+        combo.bind("<<ComboboxSelected>>", on_change)
+
     def schedule_recompute(self, delay_ms: int = 120) -> None:
         if self.pending_recompute is not None:
             self.root.after_cancel(self.pending_recompute)
         self.pending_recompute = self.root.after(delay_ms, lambda: self.recompute_and_redraw(interactive=False))
+
+    def _flush_pending_recompute(self) -> None:
+        if self.pending_recompute is None:
+            return
+        try:
+            self.root.after_cancel(self.pending_recompute)
+        except Exception:
+            pass
+        self.pending_recompute = None
+        self.recompute_and_redraw(interactive=False)
 
     def on_auto_center_toggle(self) -> None:
         if self.stl_path is not None:
@@ -651,6 +722,14 @@ class ScratchDesktopApp:
             f"{float(p[2]):.{decimals}f}"
         )
 
+    def _current_arc_mode(self) -> str:
+        if str(self.arc_mode.get()).strip().lower().startswith("elliptic"):
+            return "elliptic"
+        return "semi"
+
+    def _current_ellipse_ratio(self) -> float:
+        return clamp(float(self.ellipse_ratio.get()), 0.20, 1.00)
+
     def _build_profile_paths_from_arcs(
         self,
         zero_vertices: np.ndarray,
@@ -757,6 +836,8 @@ class ScratchDesktopApp:
                 n_view=n_view,
                 dedupe_decimals=6,
                 min_arc_radius=float(self.min_arc_radius.get()),
+                arc_mode=self._current_arc_mode(),
+                ellipse_ratio=self._current_ellipse_ratio(),
             )
             self.current_arcs = arcs
             self.profile_paths = self._build_profile_paths_from_arcs(
@@ -804,6 +885,7 @@ class ScratchDesktopApp:
         if self.show_profile.get():
             angle = float(self.view_angle.get())
             rigid = bool(self.rigid_profile.get())
+            profile_ratio = self._current_ellipse_ratio() if self._current_arc_mode() == "elliptic" else 1.0
 
             if interactive:
                 path_stride = 2
@@ -817,8 +899,8 @@ class ScratchDesktopApp:
                 for edge in edges_to_draw:
                     p1 = self.last_projected[edge.start_idx]
                     p2 = self.last_projected[edge.end_idx]
-                    x1, y1 = point_at_angle_projected(p1, angle, self.last_n_view)
-                    x2, y2 = point_at_angle_projected(p2, angle, self.last_n_view)
+                    x1, y1 = point_at_angle_projected(p1, angle, self.last_n_view, ellipse_ratio=profile_ratio)
+                    x2, y2 = point_at_angle_projected(p2, angle, self.last_n_view, ellipse_ratio=profile_ratio)
                     self.canvas.create_line(
                         x1,
                         y1,
@@ -847,6 +929,11 @@ class ScratchDesktopApp:
                         )
 
         if self.stl_path is not None:
+            arc_mode_name = self._current_arc_mode()
+            if arc_mode_name == "elliptic":
+                arc_mode_status = f"ELL({self._current_ellipse_ratio():.2f})"
+            else:
+                arc_mode_status = "SEMI"
             self.status_var.set(
                 " | ".join(
                     [
@@ -858,6 +945,7 @@ class ScratchDesktopApp:
                         f"LR eff: {self.last_preview_lr:.2f}",
                         f"Edge step: {self.last_edge_stride}",
                         f"Paths: {len(self.profile_paths)}",
+                        f"Arc: {arc_mode_status}",
                         f"Sim: {'RIGID' if self.rigid_profile.get() else 'LEGACY'}",
                         f"Mode: {self.last_mode}",
                         f"Yaw/Pitch: {self.yaw_deg:.1f}/{self.pitch_deg:.1f}",
@@ -893,6 +981,8 @@ class ScratchDesktopApp:
             n_view=n_view,
             dedupe_decimals=6,
             min_arc_radius=float(self.min_arc_radius.get()),
+            arc_mode=self._current_arc_mode(),
+            ellipse_ratio=self._current_ellipse_ratio(),
         )
         return arcs_full, zero_vertices
 
@@ -904,6 +994,9 @@ class ScratchDesktopApp:
         """
         if self.model_vertices is None:
             raise ValueError("Nessun modello caricato.")
+
+        # Ensure export uses the latest UI parameters (arc mode, ellipse ratio, etc.).
+        self._flush_pending_recompute()
 
         if self.export_use_preview.get():
             if self.last_mode == "FAST":

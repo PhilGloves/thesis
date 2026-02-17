@@ -48,6 +48,8 @@ class PipelineConfig:
     stroke_width: float
     dedupe_decimals: int
     min_arc_radius: float
+    arc_mode: str
+    ellipse_ratio: float
 
 
 @dataclass
@@ -325,11 +327,17 @@ def generate_arcs(
     n_view: float,
     dedupe_decimals: int,
     min_arc_radius: float,
+    arc_mode: str = "semi",
+    ellipse_ratio: float = 0.65,
 ) -> list[Arc]:
     seen_coords: set[str] = set()
     seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
     arcs: list[Arc] = []
     geom_decimals = max(3, dedupe_decimals - 2)
+    mode = str(arc_mode).strip().lower()
+    if mode not in ("semi", "elliptic"):
+        mode = "semi"
+    ell_ratio = max(0.15, min(1.0, float(ellipse_ratio)))
 
     for edge in edges:
         model_start = model_vertices[edge.start_idx]
@@ -356,6 +364,11 @@ def generate_arcs(
             seen_coords.add(coord_hash)
 
             rect_x, rect_y, rect_w, rect_h = get_arc_square(point, n_view)
+            if mode == "elliptic":
+                cx = rect_x + rect_w / 2.0
+                cy = rect_y + rect_h / 2.0
+                rect_h = max(1.0, rect_w * ell_ratio)
+                rect_y = cy - rect_h / 2.0
             radius = rect_w / 2.0
             if radius < min_arc_radius:
                 continue
@@ -859,19 +872,22 @@ def write_simulation_html(
     html_path.write_text(html, encoding="utf-8")
 
 
-def arc_endpoints_svg(arc: Arc) -> tuple[float, float, float, float, float]:
-    r = arc.rect_w / 2.0
+def arc_endpoints_svg(arc: Arc) -> tuple[float, float, float, float, float, float]:
+    rx = arc.rect_w / 2.0
+    ry = arc.rect_h / 2.0
     cx = arc.rect_x + arc.rect_w / 2.0
     cy = arc.rect_y + arc.rect_h / 2.0
 
     start_rad = math.radians(arc.start_angle)
     end_rad = math.radians(arc.start_angle + arc.sweep_angle)
 
-    x1 = cx + r * math.cos(start_rad)
-    y1 = cy + r * math.sin(start_rad)
-    x2 = cx + r * math.cos(end_rad)
-    y2 = cy + r * math.sin(end_rad)
-    return x1, y1, x2, y2, r
+    # Keep the same angular convention used by Tk canvas preview:
+    # y = cy - r * sin(theta)
+    x1 = cx + rx * math.cos(start_rad)
+    y1 = cy - ry * math.sin(start_rad)
+    x2 = cx + rx * math.cos(end_rad)
+    y2 = cy - ry * math.sin(end_rad)
+    return x1, y1, x2, y2, rx, ry
 
 
 def write_svg(svg_path: Path, arcs: list[Arc], stroke_width: float) -> None:
@@ -882,13 +898,13 @@ def write_svg(svg_path: Path, arcs: list[Arc], stroke_width: float) -> None:
     path_cmds: list[str] = []
 
     for arc in arcs:
-        x1, y1, x2, y2, r = arc_endpoints_svg(arc)
+        x1, y1, x2, y2, rx, ry = arc_endpoints_svg(arc)
         max_x = max(max_x, x1, x2)
         max_y = max(max_y, y1, y2)
         path_cmds.append(f"M {x1:.6f} {y1:.6f}")
         # Keep arc orientation consistent with Tk canvas preview:
-        # for our semicircles the exported sweep must be CCW (sweep-flag 0).
-        path_cmds.append(f"A {r:.6f} {r:.6f} 0 0 0 {x2:.6f} {y2:.6f}")
+        # use sweep-flag 0 to match extent direction in preview.
+        path_cmds.append(f"A {rx:.6f} {ry:.6f} 0 0 0 {x2:.6f} {y2:.6f}")
 
     width = int(math.ceil(max_x)) + 1
     height = int(math.ceil(max_y)) + 1
@@ -978,6 +994,19 @@ def parse_args() -> argparse.Namespace:
         default=4.0,
         help="Filter out arcs with radius smaller than this value (in canvas pixels).",
     )
+    parser.add_argument(
+        "--arc-mode",
+        type=str,
+        default="semi",
+        choices=("semi", "elliptic"),
+        help="Arc geometry mode.",
+    )
+    parser.add_argument(
+        "--ellipse-ratio",
+        type=float,
+        default=0.65,
+        help="Ellipse height/width ratio when --arc-mode=elliptic.",
+    )
 
     parser.add_argument("--canvas-width", type=int, default=710, help="Camera canvas width in pixels")
     parser.add_argument("--canvas-height", type=int, default=549, help="Camera canvas height in pixels")
@@ -1010,6 +1039,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--stroke-width must be > 0")
     if args.min_arc_radius < 0:
         raise ValueError("--min-arc-radius must be >= 0")
+    if args.arc_mode not in ("semi", "elliptic"):
+        raise ValueError("--arc-mode must be 'semi' or 'elliptic'")
+    if args.ellipse_ratio <= 0 or args.ellipse_ratio > 1.0:
+        raise ValueError("--ellipse-ratio must be in (0, 1]")
     if args.canvas_width <= 0 or args.canvas_height <= 0:
         raise ValueError("--canvas-width and --canvas-height must be > 0")
     if args.current_scale <= 0:
@@ -1040,6 +1073,8 @@ def run(args: argparse.Namespace) -> int:
         stroke_width=float(args.stroke_width),
         dedupe_decimals=int(args.dedupe_decimals),
         min_arc_radius=float(args.min_arc_radius),
+        arc_mode=str(args.arc_mode),
+        ellipse_ratio=float(args.ellipse_ratio),
     )
 
     mesh = load_mesh(args.stl)
@@ -1062,6 +1097,8 @@ def run(args: argparse.Namespace) -> int:
         n_view=n_view,
         dedupe_decimals=pipeline.dedupe_decimals,
         min_arc_radius=pipeline.min_arc_radius,
+        arc_mode=pipeline.arc_mode,
+        ellipse_ratio=pipeline.ellipse_ratio,
     )
 
     write_svg(args.svg, arcs, stroke_width=pipeline.stroke_width)

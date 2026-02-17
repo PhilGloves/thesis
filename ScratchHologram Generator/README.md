@@ -46,6 +46,9 @@ Nell'app puoi:
 6. opzionale `Cull hidden arcs on export` per rimuovere archi occlusi (dietro superfici in primo piano) in SVG/G-code.
    - usa `Cull strength` per regolare quanto e` aggressivo il filtro (`20-50%` consigliato su modelli complessi).
 7. `Export exactly preview` per esportare lo stesso dataset di archi attualmente in preview (evita differenze preview/export).
+8. scegliere la geometria degli archi:
+   - `Semicircle (CNC)`: semicerchi perfetti, piu` adatti a strategie G2/G3.
+   - `Elliptic`: archi schiacciati in verticale; usa `Ellipse ratio` (0.20..1.00).
 
 Nota coerenza preview/export:
 - con `Export exactly preview` attivo e `Cull hidden arcs on export` disattivo, export e preview risultano 1:1 lato geometria;
@@ -77,6 +80,8 @@ Note preview:
 - `line-resolution`: densita` di campionamento lungo gli spigoli.
 - `min-arc-radius`: filtro anti micro-archi.
 - `stroke-width`: spessore visuale arco in SVG.
+- `arc-mode`: `semi` oppure `elliptic`.
+- `ellipse-ratio`: rapporto altezza/larghezza dell'arco quando `arc-mode=elliptic`.
 - camera (`po`, `pr`, `look-up`, `zf`, `current-scale`) per la proiezione.
 
 ## Output
