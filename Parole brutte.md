@@ -150,6 +150,183 @@ Questa scelta progettuale separa efficacemente rendering interattivo ed export f
 
 
 
+
+
+
+---------------ROBA SCRITTA DA ZIO CHAT PER LA PARTE DI VALIDAZIONE DEL GCODE---------
+
+## Capitolo X - Validazione del G-code generato
+
+### X.1 Obiettivo della validazione
+
+Dopo l’implementazione della pipeline di generazione degli scratch hologram (da modello STL a traiettorie 2D e relativi export), è stata eseguita una fase specifica di validazione del **G-code** prodotto dal programma, con l’obiettivo di verificare:
+
+- correttezza sintattica del file G-code;
+- coerenza geometrica delle traiettorie rispetto alla preview del software;
+- corretto utilizzo delle primitive di movimento CNC in base alla modalità selezionata;
+- assenza di anomalie evidenti nei movimenti rapidi e nelle quote Z.
+
+Questa fase è fondamentale perché rappresenta il passaggio tra una simulazione grafica (preview/SVG) e un output effettivamente utilizzabile in un contesto di lavorazione CNC.
+
+### X.2 Strumento di test scelto: CutViewer
+
+Per la validazione preliminare è stato scelto **CutViewer** (`https://cutviewer.com/app`), un visualizzatore/simulatore G-code via browser.
+
+La scelta è stata motivata da ragioni pratiche:
+
+- interfaccia semplice e immediata;
+- caricamento rapido dei file `.nc`;
+- visualizzazione simultanea di codice e traiettorie;
+- sufficiente per verificare il comportamento del G-code generato in questa fase del progetto.
+
+Era stata considerata anche l’alternativa **CAMotics**, più completa ma meno immediata per l’obiettivo corrente (verifica rapida e focalizzata delle traiettorie generate).
+
+### X.3 Configurazione dei test
+
+I test sono stati eseguiti a partire dal modello di riferimento:
+
+- `basic_cube_-_10mm.stl`
+
+Sono stati generati due file G-code, corrispondenti alle due modalità di generazione degli archi supportate dal programma:
+
+- modalità **Semicircle (CNC)**;
+- modalità **Elliptic**.
+
+L’idea è confrontare due strategie geometriche equivalenti sul piano concettuale (stesso insieme di scratch), ma differenti dal punto di vista della rappresentazione CNC.
+
+### X.4 Criteri di verifica adottati
+
+La validazione è stata svolta con una combinazione di controlli statici (lettura del G-code) e dinamici (ispezione della traiettoria in CutViewer).
+
+#### X.4.1 Controlli statici sul file G-code
+
+Sono stati verificati i seguenti elementi nel file esportato:
+
+- presenza dell’header CNC corretto;
+- unità di misura in millimetri (`G21`);
+- coordinate assolute (`G90`);
+- piano di lavoro XY (`G17`);
+- feed in unità/minuto (`G94`);
+- quota di sicurezza (`G0 Z...`) prima degli spostamenti rapidi;
+- quota di incisione (`G1 Z...`) coerente con il preset impostato.
+
+Nel caso testato, il file mostrava correttamente comandi del tipo:
+
+- `G21`, `G90`, `G17`, `G94`
+- `G0 Z3.0000` (quota sicura)
+- `M3 S12000` (avvio mandrino)
+- `G1 Z-0.0800 F220.00` (discesa a quota incisione)
+
+#### X.4.2 Controlli dinamici in simulazione
+
+In CutViewer sono stati controllati:
+
+- forma globale della traiettoria;
+- coerenza con il pattern atteso del cubo scratch;
+- assenza di archi “impazziti” o segmenti fuori figura;
+- corretto alternarsi di:
+  - rapido (`G0`) a quota sicura,
+  - plunge (`G1 Z...`),
+  - passata di incisione (`G2/G3` oppure `G1` segmentati);
+- continuità e regolarità del tracciato.
+
+### X.5 Risultati del test - Modalità Semicircle (CNC)
+
+Nella modalità **Semicircle (CNC)**, il G-code generato utilizza archi circolari nativi CNC tramite comandi `G2/G3`.
+
+#### Osservazioni principali
+
+- Le traiettorie risultano coerenti con la geometria prevista.
+- Il pattern del cubo è riconoscibile e stabile.
+- I movimenti rapidi risultano eseguiti a quota sicura.
+- I movimenti di taglio usano correttamente primitive ad arco (`G2/G3`).
+- Il file risulta relativamente compatto (numero di righe contenuto rispetto alla modalità elliptic).
+
+Questo comportamento è coerente con l’obiettivo della modalità “CNC”, che privilegia una rappresentazione efficiente e direttamente compatibile con controller che supportano bene gli archi circolari.
+
+### X.6 Risultati del test - Modalità Elliptic
+
+Nella modalità **Elliptic**, le traiettorie non possono essere rappresentate direttamente con `G2/G3`, poiché il G-code standard gestisce archi circolari ma non ellissi generiche.
+
+Per questo motivo, il programma esporta le ellissi come **polilinee** composte da molti segmenti `G1`.
+
+#### Osservazioni principali
+
+- Il comportamento in simulazione risulta corretto e coerente con la forma attesa.
+- Le traiettorie appaiono più “dense” e con un numero di segmenti molto maggiore.
+- Il numero totale di righe del file cresce sensibilmente rispetto alla modalità semicircle.
+- La forma finale è visivamente più vicina a un arco ellittico schiacciato.
+
+In pratica:
+
+- gli **archi logici** (scratch) restano gli stessi;
+- aumenta il numero di **movimenti macchina** necessari per approssimarli.
+
+Questo era atteso ed è un risultato corretto.
+
+### X.7 Confronto tra le due modalità di export CNC
+
+Dal punto di vista della validazione, entrambe le modalità risultano funzionanti, ma con trade-off diversi.
+
+#### Modalità Semicircle (CNC)
+
+- Primitive principali: `G2/G3`
+- Vantaggi:
+  - file più corto;
+  - meno movimenti;
+  - maggiore efficienza esecutiva;
+  - ottima compatibilità CNC.
+- Svantaggi:
+  - geometria limitata ad archi circolari.
+
+#### Modalità Elliptic
+
+- Primitive principali: `G1` (segmentazione)
+- Vantaggi:
+  - maggiore libertà geometrica;
+  - possibilità di ottenere scratch più “schiacciati”/morbidi.
+- Svantaggi:
+  - file più lungo;
+  - più segmenti;
+  - tempi macchina potenzialmente maggiori.
+
+### X.8 Interpretazione dei risultati
+
+La validazione in CutViewer ha mostrato che il G-code prodotto dal programma è:
+
+- **sintatticamente corretto**;
+- **geometricamente coerente** con il pattern generato;
+- **consistente** con la modalità di esportazione selezionata (`semicircle` vs `elliptic`).
+
+In particolare, il test conferma che:
+
+- la modalità `Semicircle (CNC)` esporta effettivamente archi circolari tramite `G2/G3`;
+- la modalità `Elliptic` esporta effettivamente una discretizzazione in segmenti `G1`;
+- i movimenti in Z (sicurezza/taglio) sono gestiti correttamente nella sequenza di lavorazione.
+
+### X.9 Limiti della validazione eseguita
+
+La validazione svolta è da considerarsi **preliminare ma significativa**.
+
+Limiti principali:
+
+- CutViewer è stato usato come strumento di verifica delle traiettorie, non come simulatore CAM completo di processo;
+- non è stata ancora eseguita una validazione su macchina reale;
+- non sono stati ancora ottimizzati i tempi di percorso (ordinamento delle traiettorie, riduzione dei rapidi inutili).
+
+Questi aspetti rappresentano una naturale estensione del lavoro, ma non compromettono la validità della dimostrazione attuale della pipeline.
+
+### X.10 Conclusione del capitolo
+
+La fase di test del G-code ha confermato che il sistema sviluppato produce output CNC coerente e utilizzabile per una simulazione preliminare di lavorazione.
+
+Il risultato è particolarmente rilevante perché dimostra la correttezza del passaggio:
+
+**modello STL -> generazione scratch -> export geometrico -> G-code CNC simulabile**
+
+In altre parole, la pipeline non si limita a una visualizzazione grafica (preview/SVG), ma arriva a un formato operativo compatibile con un flusso di lavorazione CNC reale.
+
+
 ------------------------------
 
 

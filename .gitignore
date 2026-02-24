@@ -18,5 +18,5 @@ out/
 ScratchHologram Generator/out/
 __pycache__/
 *.nc
-
+*.pyc
 ScratchHolograms-master

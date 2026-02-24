@@ -895,27 +895,45 @@ def arc_endpoints_svg(arc: Arc) -> tuple[float, float, float, float, float, floa
 def write_svg(svg_path: Path, arcs: list[Arc], stroke_width: float) -> None:
     svg_path.parent.mkdir(parents=True, exist_ok=True)
 
-    max_x = 1.0
-    max_y = 1.0
+    min_x = math.inf
+    min_y = math.inf
+    max_x = -math.inf
+    max_y = -math.inf
     path_cmds: list[str] = []
 
     for arc in arcs:
         x1, y1, x2, y2, rx, ry = arc_endpoints_svg(arc)
-        max_x = max(max_x, x1, x2)
-        max_y = max(max_y, y1, y2)
+        # Use the full ellipse rect as a conservative SVG bounds estimate.
+        # Using only the endpoints can clip the apex of semicircle/elliptic arcs.
+        min_x = min(min_x, arc.rect_x, x1, x2)
+        min_y = min(min_y, arc.rect_y, y1, y2)
+        max_x = max(max_x, arc.rect_x + arc.rect_w, x1, x2)
+        max_y = max(max_y, arc.rect_y + arc.rect_h, y1, y2)
         path_cmds.append(f"M {x1:.6f} {y1:.6f}")
         # Keep arc orientation consistent with Tk canvas preview:
         # use sweep-flag 0 to match extent direction in preview.
         path_cmds.append(f"A {rx:.6f} {ry:.6f} 0 0 0 {x2:.6f} {y2:.6f}")
 
-    width = int(math.ceil(max_x)) + 1
-    height = int(math.ceil(max_y)) + 1
+    if path_cmds:
+        pad = max(1.0, stroke_width)
+        view_x = min_x - pad
+        view_y = min_y - pad
+        view_w = max(1.0, (max_x - min_x) + (2.0 * pad))
+        view_h = max(1.0, (max_y - min_y) + (2.0 * pad))
+    else:
+        view_x = 0.0
+        view_y = 0.0
+        view_w = 1.0
+        view_h = 1.0
+
+    width = int(math.ceil(view_w))
+    height = int(math.ceil(view_h))
 
     rows: list[str] = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         (
             f'<svg width="{width}" height="{height}" '
-            f'viewBox="0 0 {width} {height}" '
+            f'viewBox="{view_x:.6f} {view_y:.6f} {view_w:.6f} {view_h:.6f}" '
             'fill="none" xmlns="http://www.w3.org/2000/svg">'
         ),
     ]
