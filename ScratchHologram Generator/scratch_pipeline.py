@@ -373,7 +373,9 @@ def generate_arcs(
             if radius < min_arc_radius:
                 continue
 
-            start_angle = 0.0 if (float(point[2]) - n_view) > 0.0 else 180.0
+            # Convention aligned with desktop preview:
+            # view-angle 0 corresponds to the neutral projected pose.
+            start_angle = 180.0 if (float(point[2]) - n_view) > 0.0 else 0.0
             arc_hash = (
                 round(rect_x, geom_decimals),
                 round(rect_y, geom_decimals),

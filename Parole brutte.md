@@ -8,6 +8,10 @@ Il sistema produce output in formato SVG e G-code, in funzione della geometria d
 Il contributo del lavoro consiste nello sviluppo di una soluzione riproducibile e indipendente da strumenti proprietari, concepita come base estendibile per l’ottimizzazione dei percorsi CNC, la validazione sperimentale e future applicazioni nella fabbricazione di scratch hologram.
 
 
+
+
+# TODO
+
 ### Cos’è uno scratch / specular hologram
 Uno scratch hologram è una tecnica di rappresentazione tridimensionale analogica che utilizza micro-incisioni su una superficie riflettente per simulare la presenza di punti nello spazio. A differenza dell’olografia classica basata su interferenza laser, gli scratch hologram sfruttano la riflessione speculare della luce.
 Ogni graffio inciso sulla superficie agisce come un micro-specchio. Se orientato correttamente, esso riflette la luce verso l’osservatore in modo tale da simulare la provenienza della luce da un punto virtuale nello spazio tridimensionale. L’insieme coordinato di molti graffi consente quindi di ricostruire una forma tridimensionale percepita.

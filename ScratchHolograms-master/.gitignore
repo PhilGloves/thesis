@@ -1,0 +1,8 @@
+Display/
+*.bbprojectd
+*.pyc
+doc/
+Unused_models/
+/patterns_to_print/
+/Archive
+wiki

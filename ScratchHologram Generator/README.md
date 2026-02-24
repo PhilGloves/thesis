@@ -16,7 +16,6 @@ Il progetto include:
 
 - Python 3.10+ (testato con Python 3.14).
 - `tkinter` (incluso di default su Windows Python standard).
-- Per preview GPU: `PyQt6`, `pyqtgraph`, `PyOpenGL` (installati via `requirements.txt`).
 
 ## Setup (PowerShell)
 
@@ -32,26 +31,37 @@ python -m venv .venv
 .\.venv\Scripts\python.exe .\scratch_desktop_app.py
 ```
 
-## Avvio Preview GPU
+## Validazione CNC (punto 1)
 
-Puoi avviare la preview GPU in due modi:
-
-1. Dall'app desktop tramite il pulsante `Preview GPU`.
-2. Direttamente da terminale:
+Per generare un pacchetto di test ripetibile (SVG + G-code + report):
 
 ```powershell
-.\.venv\Scripts\python.exe .\scratch_gpu_preview.py --stl "..\knots\basic_cube_-_10mm.stl"
+.\.venv\Scripts\python.exe .\cnc_validation_suite.py
 ```
 
-Note preview GPU:
-- rendering OpenGL (molto piu` fluido su modelli densi rispetto a `tk.Canvas`);
-- usa lo stesso motore di generazione archi (line resolution, arc mode, ellipse ratio, view angle);
-- export SVG dalla vista corrente.
+Output in:
+- `.\out\cnc_validation\`
+  - file `.svg` e `.nc` per ogni modello in modalita` `semi` e `elliptic`,
+  - `validation_report.md` (checklist CAM + metriche),
+  - `validation_report.json` (dati strutturati).
+
+Note:
+- per mantenere tempi ragionevoli, il suite applica un cap con `--max-arcs-per-case`
+  (downsampling uniforme solo a scopo validazione; il valore compare come `DS` nel report).
+- nel report, `G1-XY` indica i movimenti lineari in XY:
+  in modalita` `semi` deve essere molto inferiore a `G2/G3`.
+
+Puoi passare STL specifici:
+
+```powershell
+.\.venv\Scripts\python.exe .\cnc_validation_suite.py `
+  --models "..\knots\basic_cube_-_10mm.stl" "..\knots\trefoil.stl"
+```
 
 Nell'app puoi:
 1. caricare STL (`Apri STL`);
 2. ruotare la camera direttamente sulla preview archi (drag) e zoomare con rotellina;
-3. regolare i parametri (line resolution, min arc radius, quality, scale, zf, view angle, ecc.);
+3. regolare i parametri (line resolution, min arc radius, preview quality, view angle, arc mode, ellipse ratio, cull, ecc.);
 4. esportare lo SVG della vista corrente (`Esporta SVG`);
 5. esportare il G-code (`Esporta G-code`) con dialog parametri:
    - larghezza finale in mm,
@@ -60,24 +70,21 @@ Nell'app puoi:
    - segmentazione massima,
    - RPM mandrino opzionale (0 disabilita `M3/M5`),
    - inversione asse Y opzionale.
-6. opzionale `Cull hidden arcs on export` per rimuovere archi occlusi (dietro superfici in primo piano) in SVG/G-code.
-   - usa `Cull strength` per regolare quanto e` aggressivo il filtro (`20-50%` consigliato su modelli complessi).
-7. `Export exactly preview` per esportare lo stesso dataset di archi attualmente in preview (evita differenze preview/export).
-8. scegliere la geometria degli archi:
+6. opzionale `Advanced cull (preview + export)` per rimuovere archi occlusi sia in preview sia in export.
+   - usa `Cull strength` per regolare quanto e` aggressivo il filtro (`20-50%` consigliato su modelli complessi);
+   - `Advanced cull samples` aumenta precisione del filtro (piu` lento).
+7. scegliere la geometria degli archi:
    - `Semicircle (CNC)`: semicerchi perfetti, piu` adatti a strategie G2/G3.
    - `Elliptic`: archi schiacciati in verticale; usa `Ellipse ratio` (0.20..1.00).
 
 Nota coerenza preview/export:
-- con `Export exactly preview` attivo e `Cull hidden arcs on export` disattivo, export e preview risultano 1:1 lato geometria;
-- se il culling export e` attivo, l'export rimuove archi nascosti e quindi differira` dalla preview non-cullata.
+- l'export usa lo stesso dataset geometrico della preview come base;
+- se `Advanced cull (preview + export)` e` attivo, preview ed export applicano lo stesso filtro di visibilita`.
 
 Note preview:
 - `Preview quality` influenza davvero dettaglio e velocita` (campionamento edge + line resolution effettiva).
 - durante il drag la preview passa in modalita` `FAST` per ridurre il lag.
 - `View angle` + `Show simulated profile` simulano il movimento osservato nello scratch hologram.
-- `Rigid simulation`:
-  - ON: profilo simulato rigido (coerenza geometrica 3D migliore, consigliato per cubo/forme semplici).
-  - OFF: simulazione legacy che segue i punti sugli archi.
 
 ## Uso CLI (pipeline)
 

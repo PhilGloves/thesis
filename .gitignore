@@ -1,2 +1,22 @@
 mymikemiller/abrasion-hologram-printer
 Shchuko/ScratchedHologramFrom3D
+
+# build/output
+out/
+**/out/
+
+# CNC outputs
+*.nc
+*.gcode
+*.tap
+*.ngc
+
+# Big generated vectors
+*.svg
+*.pdf
+
+ScratchHologram Generator/out/
+__pycache__/
+*.nc
+
+ScratchHolograms-master

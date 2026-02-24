@@ -1,5 +1,2 @@
 numpy>=1.26
 trimesh>=4.4
-PyQt6>=6.6
-pyqtgraph>=0.13
-PyOpenGL>=3.1
