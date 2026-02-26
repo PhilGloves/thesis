@@ -129,3 +129,68 @@ for c in curves:
 
 print(f"Imported {len(curves)} curve objects from SVG.")
 # render_still(RENDER_PATH)  # uncomment to render immediately
+
+
+--------------------------------------------------------
+
+//SCRIPT PER IL RENDERING DI 10 FRAME
+
+import bpy
+import math
+import os
+
+# ===== SETTINGS =====
+OUT_DIR = r"C:\Users\filip\Documents\thesis\Blender\renders_test10"
+FILE_BASENAME = "hologram_test10"
+
+START_FRAME = 1
+END_FRAME = 10
+
+# Rotazione più ampia (gradi)
+X0, Z0 = 45, 30
+X1, Z1 = 75, 60
+
+FPS = 30
+SAMPLES = 64  # basso per test veloce
+# ====================
+
+scene = bpy.context.scene
+scene.render.engine = 'CYCLES'
+scene.cycles.samples = SAMPLES
+scene.cycles.use_denoising = True
+
+scene.render.image_settings.file_format = 'PNG'
+scene.render.fps = FPS
+scene.frame_start = START_FRAME
+scene.frame_end = END_FRAME
+
+os.makedirs(OUT_DIR, exist_ok=True)
+scene.render.filepath = os.path.join(OUT_DIR, FILE_BASENAME + "_")
+
+sun = bpy.data.objects.get("Sun")
+if sun is None:
+    raise RuntimeError("Oggetto 'Sun' non trovato. Rinomina la luce in 'Sun'.")
+
+# Cancella animazioni precedenti
+sun.animation_data_clear()
+
+def set_rot(x_deg, z_deg):
+    sun.rotation_euler[0] = math.radians(x_deg)
+    sun.rotation_euler[2] = math.radians(z_deg)
+
+# Keyframe start (inseriamo SOLO X e Z, così è chiarissimo)
+scene.frame_set(START_FRAME)
+set_rot(X0, Z0)
+sun.keyframe_insert(data_path="rotation_euler", index=0)  # X
+sun.keyframe_insert(data_path="rotation_euler", index=2)  # Z
+
+# Keyframe end
+scene.frame_set(END_FRAME)
+set_rot(X1, Z1)
+sun.keyframe_insert(data_path="rotation_euler", index=0)  # X
+sun.keyframe_insert(data_path="rotation_euler", index=2)  # Z
+
+print("✅ Keyframe inseriti su X e Z.")
+print("✅ Render PNG in:", OUT_DIR)
+
+bpy.ops.render.render(animation=True)
