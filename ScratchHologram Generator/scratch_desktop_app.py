@@ -25,6 +25,8 @@ from scratch_pipeline import (
     Arc,
     CameraConfig,
     Edge,
+    build_sample_visibility_lookup,
+    build_model_to_view_matrix,
     build_model_to_window_matrix,
     build_model_vertices_and_edges,
     ensure_dependencies,
@@ -95,273 +97,6 @@ def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float,
         y = cy - ry * math.sin(theta)
         points.append((x, y))
     return points
-
-
-def point_on_arc_by_u(arc: Arc, u: float) -> tuple[float, float]:
-    """
-    Parametric point on arc using u in [0, 1].
-
-    This helper is used by advanced visibility culling to test many samples
-    along each arc and keep only visible angular intervals.
-    """
-    u_clamped = clamp(float(u), 0.0, 1.0)
-    rx = max(0.1, float(arc.rect_w) / 2.0)
-    ry = max(0.1, float(arc.rect_h) / 2.0)
-    cx = float(arc.rect_x) + (float(arc.rect_w) / 2.0)
-    cy = float(arc.rect_y) + (float(arc.rect_h) / 2.0)
-    theta_deg = float(arc.start_angle) + (float(arc.sweep_angle) * u_clamped)
-    theta = math.radians(theta_deg)
-    x = cx + (rx * math.cos(theta))
-    y = cy - (ry * math.sin(theta))
-    return x, y
-
-
-def build_triangle_grid(
-    projected_vertices: np.ndarray,
-    faces: np.ndarray,
-    cell: float,
-) -> tuple[list[tuple[float, ...]], dict[tuple[int, int], list[int]]]:
-    """
-    Build projected-triangle cache + 2D acceleration grid for fast lookups.
-
-    Triangle tuple layout:
-    (x0,y0,z0, x1,y1,z1, x2,y2,z2, denom, min_x,max_x,min_y,max_y)
-    """
-    tri_data: list[tuple[float, ...]] = []
-    grid: dict[tuple[int, int], list[int]] = {}
-
-    for tri in faces:
-        i0, i1, i2 = int(tri[0]), int(tri[1]), int(tri[2])
-        p0 = projected_vertices[i0]
-        p1 = projected_vertices[i1]
-        p2 = projected_vertices[i2]
-
-        if not (
-            np.isfinite(p0[0])
-            and np.isfinite(p0[1])
-            and np.isfinite(p0[2])
-            and np.isfinite(p1[0])
-            and np.isfinite(p1[1])
-            and np.isfinite(p1[2])
-            and np.isfinite(p2[0])
-            and np.isfinite(p2[1])
-            and np.isfinite(p2[2])
-        ):
-            continue
-
-        x0, y0, z0 = float(p0[0]), float(p0[1]), float(p0[2])
-        x1, y1, z1 = float(p1[0]), float(p1[1]), float(p1[2])
-        x2, y2, z2 = float(p2[0]), float(p2[1]), float(p2[2])
-        denom = ((y1 - y2) * (x0 - x2)) + ((x2 - x1) * (y0 - y2))
-        if abs(denom) < EPS:
-            continue
-
-        min_x = min(x0, x1, x2)
-        max_x = max(x0, x1, x2)
-        min_y = min(y0, y1, y2)
-        max_y = max(y0, y1, y2)
-
-        tri_idx = len(tri_data)
-        tri_data.append((x0, y0, z0, x1, y1, z1, x2, y2, z2, denom, min_x, max_x, min_y, max_y))
-
-        ix0 = int(math.floor(min_x / cell))
-        ix1 = int(math.floor(max_x / cell))
-        iy0 = int(math.floor(min_y / cell))
-        iy1 = int(math.floor(max_y / cell))
-        for ix in range(ix0, ix1 + 1):
-            for iy in range(iy0, iy1 + 1):
-                key = (ix, iy)
-                if key in grid:
-                    grid[key].append(tri_idx)
-                else:
-                    grid[key] = [tri_idx]
-
-    return tri_data, grid
-
-
-def sample_covering_depths(
-    x: float,
-    y: float,
-    tri_data: list[tuple[float, ...]],
-    grid: dict[tuple[int, int], list[int]],
-    cell: float,
-    inside_tol: float,
-) -> list[float]:
-    """Return all triangle depths covering a given screen point."""
-    ix = int(math.floor(x / cell))
-    iy = int(math.floor(y / cell))
-
-    candidate: list[int] = []
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            candidate.extend(grid.get((ix + dx, iy + dy), []))
-
-    if len(candidate) == 0:
-        return []
-
-    z_cover: list[float] = []
-    seen: set[int] = set()
-    for tri_idx in candidate:
-        if tri_idx in seen:
-            continue
-        seen.add(tri_idx)
-
-        x0, y0, z0, x1, y1, z1, x2, y2, z2, denom, min_x, max_x, min_y, max_y = tri_data[tri_idx]
-        if x < (min_x - 0.2) or x > (max_x + 0.2) or y < (min_y - 0.2) or y > (max_y + 0.2):
-            continue
-
-        a = ((y1 - y2) * (x - x2)) + ((x2 - x1) * (y - y2))
-        b = ((y2 - y0) * (x - x2)) + ((x0 - x2) * (y - y2))
-        a /= denom
-        b /= denom
-        c = 1.0 - a - b
-        if a < inside_tol or b < inside_tol or c < inside_tol:
-            continue
-
-        z_surf = (a * z0) + (b * z1) + (c * z2)
-        z_cover.append(z_surf)
-
-    return z_cover
-
-
-def advanced_cull_arcs(
-    arcs: list[Arc],
-    projected_vertices: np.ndarray,
-    faces: np.ndarray,
-    cull_strength: float,
-    samples_per_arc: int = 28,
-    grid_cell: float = 24.0,
-    min_sweep_deg: float = 2.0,
-    inside_tolerance: float = 0.0,
-) -> list[Arc]:
-    """
-    Advanced visibility culling:
-    - samples each arc along its sweep
-    - keeps only visible angular intervals
-    """
-    if len(arcs) == 0 or len(faces) == 0:
-        return arcs
-
-    tri_data, grid = build_triangle_grid(projected_vertices=projected_vertices, faces=faces, cell=grid_cell)
-    if len(tri_data) == 0:
-        return arcs
-
-    z_vals = projected_vertices[:, 2]
-    z_span = float(np.max(z_vals) - np.min(z_vals)) if projected_vertices.shape[0] > 0 else 1.0
-    z_eps = max(0.003 * z_span, 0.45)
-
-    strength = clamp(float(cull_strength), 0.0, 1.0)
-    samples = max(8, int(samples_per_arc))
-    min_sweep = max(0.1, float(min_sweep_deg))
-
-    out: list[Arc] = []
-    for arc in arcs:
-        # Cache occlusion at the arc anchor (projected edge sample).
-        # This adds camera-dependent context also when arc sample points
-        # lie outside the projected mesh silhouette.
-        anchor_x = float(arc.zero_coord[0])
-        anchor_y = float(arc.zero_coord[1])
-        anchor_z_cover = sample_covering_depths(
-            x=anchor_x,
-            y=anchor_y,
-            tri_data=tri_data,
-            grid=grid,
-            cell=grid_cell,
-            inside_tol=inside_tolerance,
-        )
-
-        visible_samples: list[bool] = []
-        for i in range(samples + 1):
-            u = i / samples
-            x, y = point_on_arc_by_u(arc, u)
-            z_cover = sample_covering_depths(
-                x=x,
-                y=y,
-                tri_data=tri_data,
-                grid=grid,
-                cell=grid_cell,
-                inside_tol=inside_tolerance,
-            )
-            if len(z_cover) == 0 and len(anchor_z_cover) > 0:
-                # Fallback to anchor coverage when local sample has no triangle hits.
-                z_cover = anchor_z_cover
-            if len(z_cover) == 0:
-                visible_samples.append(True)
-                continue
-
-            z_arc = float(arc.zero_coord[2])
-            z_front = max(z_cover)
-            # Tighter margin than legacy export cull:
-            # makes culling react to camera movement instead of keeping almost everything.
-            arc_size = max(1.0, min(float(arc.rect_w), float(arc.rect_h)))
-            adaptive_margin = z_eps + ((1.0 - strength) * (0.12 * arc_size + 0.8))
-            if strength >= 0.80:
-                required_hits = 1
-            elif strength >= 0.45:
-                required_hits = 2
-            else:
-                required_hits = 3
-
-            hit_threshold = z_arc + (0.35 * adaptive_margin)
-            occluding_hits = 0
-            for zs in z_cover:
-                if zs > hit_threshold:
-                    occluding_hits += 1
-                    if occluding_hits >= required_hits:
-                        break
-
-            is_visible = (
-                (z_front <= -1.0e29)
-                or (z_arc >= (z_front - adaptive_margin))
-                or (occluding_hits < required_hits)
-            )
-            visible_samples.append(is_visible)
-
-        # Convert point visibility into interval visibility.
-        interval_visible = [visible_samples[i] and visible_samples[i + 1] for i in range(samples)]
-        run_start: int | None = None
-        for i, is_vis in enumerate(interval_visible):
-            if is_vis and run_start is None:
-                run_start = i
-            if (not is_vis) and run_start is not None:
-                u0 = run_start / samples
-                u1 = i / samples
-                sweep = float(arc.sweep_angle) * (u1 - u0)
-                if abs(sweep) >= min_sweep:
-                    out.append(
-                        Arc(
-                            edge_id=arc.edge_id,
-                            zero_coord=arc.zero_coord,
-                            rect_x=arc.rect_x,
-                            rect_y=arc.rect_y,
-                            rect_w=arc.rect_w,
-                            rect_h=arc.rect_h,
-                            start_angle=float(arc.start_angle) + (float(arc.sweep_angle) * u0),
-                            sweep_angle=sweep,
-                        )
-                    )
-                run_start = None
-
-        if run_start is not None:
-            u0 = run_start / samples
-            u1 = 1.0
-            sweep = float(arc.sweep_angle) * (u1 - u0)
-            if abs(sweep) >= min_sweep:
-                out.append(
-                    Arc(
-                        edge_id=arc.edge_id,
-                        zero_coord=arc.zero_coord,
-                        rect_x=arc.rect_x,
-                        rect_y=arc.rect_y,
-                        rect_w=arc.rect_w,
-                        rect_h=arc.rect_h,
-                        start_angle=float(arc.start_angle) + (float(arc.sweep_angle) * u0),
-                        sweep_angle=sweep,
-                    )
-                )
-
-    # Never return empty output accidentally.
-    return out if len(out) > 0 else arcs
 
 
 def write_gcode(
@@ -545,8 +280,8 @@ class ScratchDesktopApp:
         self.pending_recompute: str | None = None
 
         self.line_resolution = tk.DoubleVar(value=3.28)
-        self.min_arc_radius = tk.DoubleVar(value=6.0)
         # Keep these fixed to simplify the UI and avoid unnecessary tuning knobs.
+        self.fixed_min_arc_radius = 0.0
         self.fixed_stroke_width = 0.05
         self.fixed_camera_scale = 0.724
         # Use a much higher zf to keep perspective almost orthographic and
@@ -561,9 +296,7 @@ class ScratchDesktopApp:
         self.show_profile = tk.BooleanVar(value=True)
         # Keep this behavior fixed: less UI noise, same practical result for this workflow.
         self.fixed_auto_center = True
-        self.export_cull_strength = tk.IntVar(value=45)
-        self.advanced_cull = tk.BooleanVar(value=False)
-        self.advanced_cull_samples = tk.IntVar(value=24)
+        self.visibility_cull = tk.BooleanVar(value=False)
 
         self.gcode_target_width_mm = 10.0
         self.gcode_safe_z_mm = 3.0
@@ -621,16 +354,6 @@ class ScratchDesktopApp:
             controls,
             row=0,
             col=1,
-            label="Min arc radius",
-            variable=self.min_arc_radius,
-            min_val=0.0,
-            max_val=25.0,
-            fmt="{:.1f}",
-        )
-        self._make_slider(
-            controls,
-            row=0,
-            col=2,
             label="Preview arc limit",
             variable=self.arc_limit,
             min_val=200,
@@ -643,17 +366,6 @@ class ScratchDesktopApp:
             controls,
             row=1,
             col=0,
-            label="Preview quality",
-            variable=self.preview_quality,
-            min_val=5,
-            max_val=100,
-            fmt="{:.0f}%",
-            integer=True,
-        )
-        self._make_slider(
-            controls,
-            row=1,
-            col=1,
             label="View angle",
             variable=self.view_angle,
             min_val=-90.0,
@@ -661,10 +373,21 @@ class ScratchDesktopApp:
             fmt="{:.0f} deg",
             redraw_only=True,
         )
+        self._make_slider(
+            controls,
+            row=0,
+            col=2,
+            label="Preview quality",
+            variable=self.preview_quality,
+            min_val=5,
+            max_val=100,
+            fmt="{:.0f}%",
+            integer=True,
+        )
         self._make_dropdown(
             controls,
-            row=2,
-            col=0,
+            row=1,
+            col=1,
             label="Arc mode",
             variable=self.arc_mode,
             values=("Semicircle (CNC)", "Elliptic"),
@@ -679,47 +402,26 @@ class ScratchDesktopApp:
             max_val=1.00,
             fmt="{:.2f}",
         )
-        self._make_slider(
-            controls,
-            row=2,
-            col=1,
-            label="Cull strength",
-            variable=self.export_cull_strength,
-            min_val=0,
-            max_val=100,
-            fmt="{:.0f}%",
-            integer=True,
-            redraw_only=True,
-        )
-        self._make_slider(
-            controls,
-            row=2,
-            col=2,
-            label="Advanced cull samples",
-            variable=self.advanced_cull_samples,
-            min_val=12,
-            max_val=80,
-            fmt="{:.0f}",
-            integer=True,
-        )
+        checkbox_row = ttk.Frame(controls)
+        checkbox_row.grid(row=2, column=0, columnspan=3, padx=8, pady=4, sticky="w")
         ttk.Checkbutton(
-            controls,
+            checkbox_row,
             text="Show arcs",
             variable=self.show_arcs,
             command=self.redraw_from_cache,
-        ).grid(row=3, column=0, padx=8, pady=4, sticky="w")
+        ).pack(side=tk.LEFT, padx=(0, 16))
         ttk.Checkbutton(
-            controls,
+            checkbox_row,
             text="Show simulated profile",
             variable=self.show_profile,
             command=self.redraw_from_cache,
-        ).grid(row=3, column=1, padx=8, pady=4, sticky="w")
+        ).pack(side=tk.LEFT, padx=(0, 16))
         ttk.Checkbutton(
-            controls,
-            text="Advanced cull (preview + export)",
-            variable=self.advanced_cull,
+            checkbox_row,
+            text="Visibility cull (Z-buffer)",
+            variable=self.visibility_cull,
             command=lambda: self.schedule_recompute(delay_ms=80),
-        ).grid(row=3, column=2, padx=8, pady=4, sticky="w")
+        ).pack(side=tk.LEFT)
 
         status = ttk.Label(self.root, textvariable=self.status_var, padding=(10, 2), anchor="w")
         status.pack(side=tk.BOTTOM, fill=tk.X)
@@ -1006,6 +708,7 @@ class ScratchDesktopApp:
 
         try:
             mtx = build_model_to_window_matrix(camera)
+            view_mtx = build_model_to_view_matrix(camera)
             projected = model_to_window(self.model_vertices, mtx)
             pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), mtx)[0]
             n_view = float(pr_view[2])
@@ -1026,22 +729,25 @@ class ScratchDesktopApp:
 
         try:
             zero_vertices = projected
-            arcs_raw = generate_arcs(
+            sample_visibility = self._visibility_sample_lookup(
+                edges_for_cull=sampled_edges,
+                view_points_per_unit_length=effective_lr,
+                camera=camera,
+                write_debug_pngs=not interactive,
+            )
+            self.current_arcs = generate_arcs(
                 model_vertices=self.model_vertices,
                 zero_vertices=zero_vertices,
                 edges=sampled_edges,
                 view_points_per_unit_length=effective_lr,
                 n_view=n_view,
                 dedupe_decimals=6,
-                min_arc_radius=float(self.min_arc_radius.get()),
+                min_arc_radius=float(self.fixed_min_arc_radius),
                 arc_mode=self._current_arc_mode(),
                 ellipse_ratio=self._current_ellipse_ratio(),
-            )
-            self.current_arcs = self._apply_visibility_cull(
-                arcs=arcs_raw,
-                projected_vertices=projected,
-                interactive=interactive,
-                source="full",
+                model_to_window_mtx=mtx,
+                model_to_view_mtx=view_mtx,
+                sample_visibility_by_edge=sample_visibility,
             )
         except Exception as exc:
             self.status_var.set(f"Errore calcolo archi: {exc}")
@@ -1121,8 +827,8 @@ class ScratchDesktopApp:
                 arc_mode_status = f"ELL({self._current_ellipse_ratio():.2f})"
             else:
                 arc_mode_status = "SEMI"
-            if self.advanced_cull.get():
-                cull_status = f"ADV {int(self.export_cull_strength.get())}%/{int(self.advanced_cull_samples.get())}s"
+            if self.visibility_cull.get():
+                cull_status = "ZBUF ON"
             else:
                 cull_status = "OFF"
             self.status_var.set(
@@ -1161,6 +867,7 @@ class ScratchDesktopApp:
         camera = self._build_camera(w, h)
 
         mtx = build_model_to_window_matrix(camera)
+        view_mtx = build_model_to_view_matrix(camera)
         zero_vertices = model_to_window(self.model_vertices, mtx)
         pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), mtx)[0]
         n_view = float(pr_view[2])
@@ -1172,9 +879,17 @@ class ScratchDesktopApp:
             view_points_per_unit_length=float(self.line_resolution.get()),
             n_view=n_view,
             dedupe_decimals=6,
-            min_arc_radius=float(self.min_arc_radius.get()),
+            min_arc_radius=float(self.fixed_min_arc_radius),
             arc_mode=self._current_arc_mode(),
             ellipse_ratio=self._current_ellipse_ratio(),
+            model_to_window_mtx=mtx,
+            model_to_view_mtx=view_mtx,
+            sample_visibility_by_edge=self._visibility_sample_lookup(
+                edges_for_cull=self.edges,
+                view_points_per_unit_length=float(self.line_resolution.get()),
+                camera=camera,
+                write_debug_pngs=True,
+            ),
         )
         return arcs_full, zero_vertices
 
@@ -1200,51 +915,35 @@ class ScratchDesktopApp:
         arcs_full, projected_vertices = self._compute_full_view_data()
         return arcs_full, projected_vertices, "full"
 
-    def _cull_strength_01(self) -> float:
-        try:
-            return clamp(float(self.export_cull_strength.get()) / 100.0, 0.0, 1.0)
-        except Exception:
-            return 0.45
-
-    def _apply_visibility_cull(
+    def _visibility_sample_lookup(
         self,
-        arcs: list[Arc],
-        projected_vertices: np.ndarray,
         *,
-        interactive: bool,
-        source: str,
-    ) -> list[Arc]:
-        """
-        Apply advanced visibility cull (single cull engine for preview + export).
-        """
-        if len(arcs) == 0:
-            return arcs
+        edges_for_cull: list[Edge],
+        view_points_per_unit_length: float,
+        camera: CameraConfig,
+        write_debug_pngs: bool,
+    ) -> dict[int, np.ndarray] | None:
+        if not bool(self.visibility_cull.get()):
+            return None
+        if self.model_vertices is None or self.faces is None or len(self.faces) == 0 or len(edges_for_cull) == 0:
+            return None
 
-        if not bool(self.advanced_cull.get()):
-            return arcs
-
-        # Keep drag interactions responsive.
-        if interactive:
-            return arcs
-        # When export source is already the preview cache, avoid double-culling.
-        if source == "preview":
-            return arcs
-        if self.faces is None or len(self.faces) == 0:
-            return arcs
-        try:
-            sample_count = max(8, int(self.advanced_cull_samples.get()))
-        except Exception:
-            sample_count = 28
-        return advanced_cull_arcs(
-            arcs=arcs,
-            projected_vertices=projected_vertices,
+        sample_visibility_by_edge, _stats = build_sample_visibility_lookup(
+            model_vertices=self.model_vertices,
+            edges=edges_for_cull,
             faces=self.faces,
-            cull_strength=self._cull_strength_01(),
-            samples_per_arc=sample_count,
-            grid_cell=24.0,
-            min_sweep_deg=2.0,
-            inside_tolerance=0.0,
+            camera=camera,
+            view_points_per_unit_length=view_points_per_unit_length,
+            zbuffer_resolution=1024,
+            coverage_dilation_size=3,
+            sample_window_size=5,
+            debug_output_prefix=(
+                Path(__file__).resolve().with_name("visibility_debug")
+                if write_debug_pngs
+                else None
+            ),
         )
+        return sample_visibility_by_edge
 
     def _prompt_gcode_settings(self) -> dict[str, float | int | bool] | None:
         parent = self.root
@@ -1356,12 +1055,7 @@ class ScratchDesktopApp:
             messagebox.showerror("Errore export SVG", str(exc))
             return
 
-        arcs_export = self._apply_visibility_cull(
-            arcs=arcs_full,
-            projected_vertices=projected_vertices,
-            interactive=False,
-            source=source,
-        )
+        arcs_export = arcs_full
 
         default_name = f"{self.stl_path.stem}_arcs.svg"
         save_path = filedialog.asksaveasfilename(
@@ -1397,12 +1091,7 @@ class ScratchDesktopApp:
             messagebox.showerror("Errore calcolo archi", str(exc))
             return
 
-        arcs_export = self._apply_visibility_cull(
-            arcs=arcs_full,
-            projected_vertices=projected_vertices,
-            interactive=False,
-            source=source,
-        )
+        arcs_export = arcs_full
 
         if len(arcs_export) == 0:
             messagebox.showwarning("Nessun arco", "Con i parametri attuali non ci sono archi da esportare.")

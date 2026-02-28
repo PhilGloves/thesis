@@ -189,6 +189,7 @@ def build_arcs_for_model(
         min_arc_radius=float(min_arc_radius),
         arc_mode=mode,
         ellipse_ratio=float(ellipse_ratio),
+        model_to_window_mtx=mtx,
     )
     return arcs, len(edges)
 

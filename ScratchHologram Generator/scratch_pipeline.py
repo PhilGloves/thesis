@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import struct
 import sys
+import zlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -28,6 +30,7 @@ except ImportError:  # pragma: no cover
 
 EPS = 1e-12
 NORMAL_TOLERANCE_DECIMALS = 4
+ORTHO_DEPTH_EPSILON_FACTOR = 2.0e-2
 
 
 @dataclass
@@ -70,6 +73,13 @@ class Arc:
     rect_h: float
     start_angle: float
     sweep_angle: float
+
+
+@dataclass
+class ZBuffer:
+    depth: np.ndarray
+    screen_width: int
+    screen_height: int
 
 
 def ensure_dependencies() -> None:
@@ -242,7 +252,7 @@ def build_model_vertices_and_edges(
     return np.asarray(unique_vertices, dtype=np.float64), filtered_edges, remapped_faces_arr
 
 
-def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
+def build_model_to_view_matrix(camera: CameraConfig) -> np.ndarray:
     po = np.asarray(camera.po, dtype=np.float64)
     pr = np.asarray(camera.pr, dtype=np.float64)
     look_up = normalize(np.asarray(camera.look_up, dtype=np.float64))
@@ -255,13 +265,18 @@ def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
     u = u / u_norm
     v = np.cross(n, u)
 
-    model_to_view = np.eye(4, dtype=np.float64)
-    model_to_view[0, 0:3] = u
-    model_to_view[1, 0:3] = v
-    model_to_view[2, 0:3] = n
-    model_to_view[0, 3] = -float(np.dot(u, po))
-    model_to_view[1, 3] = -float(np.dot(v, po))
-    model_to_view[2, 3] = -float(np.dot(n, po))
+    out = np.eye(4, dtype=np.float64)
+    out[0, 0:3] = u
+    out[1, 0:3] = v
+    out[2, 0:3] = n
+    out[0, 3] = -float(np.dot(u, po))
+    out[1, 3] = -float(np.dot(v, po))
+    out[2, 3] = -float(np.dot(n, po))
+    return out
+
+
+def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
+    model_to_view = build_model_to_view_matrix(camera)
 
     perspective = np.eye(4, dtype=np.float64)
     zf = camera.zf if abs(camera.zf) > EPS else 1e-5
@@ -294,6 +309,520 @@ def model_to_window(points_xyz: np.ndarray, model_to_window_mtx: np.ndarray) -> 
     return transformed[:, 0:3]
 
 
+def model_to_view(points_xyz: np.ndarray, model_to_view_mtx: np.ndarray) -> np.ndarray:
+    points = np.asarray(points_xyz, dtype=np.float64)
+    ones = np.ones((points.shape[0], 1), dtype=np.float64)
+    homo = np.hstack((points, ones))
+    transformed = (model_to_view_mtx @ homo.T).T
+    return transformed[:, 0:3]
+
+
+def compute_face_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    verts = np.asarray(vertices, dtype=np.float64)
+    tri_idx = np.asarray(faces, dtype=np.int64)
+    if tri_idx.size == 0:
+        return np.zeros((0, 3), dtype=np.float64)
+
+    tri = verts[tri_idx]
+    cross = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    lengths = np.linalg.norm(cross, axis=1)
+    normals = np.zeros_like(cross)
+    valid = lengths > EPS
+    if np.any(valid):
+        normals[valid] = cross[valid] / lengths[valid, None]
+    return normals
+
+
+def backface_mask(
+    face_normals: np.ndarray,
+    view_dir: np.ndarray,
+    epsilon: float = 1.0e-9,
+) -> np.ndarray:
+    normals = np.asarray(face_normals, dtype=np.float64)
+    if normals.size == 0:
+        return np.zeros((0,), dtype=bool)
+    forward = normalize(np.asarray(view_dir, dtype=np.float64))
+    dots = normals @ forward
+    return dots < -abs(float(epsilon))
+
+
+def project_to_screen(
+    points_xyz: np.ndarray,
+    camera: CameraConfig,
+    *,
+    model_to_window_mtx: np.ndarray | None = None,
+    model_to_view_mtx: np.ndarray | None = None,
+) -> np.ndarray:
+    points = np.asarray(points_xyz, dtype=np.float64)
+    if points.shape[0] == 0:
+        return np.zeros((0, 3), dtype=np.float64)
+
+    window_mtx = model_to_window_mtx if model_to_window_mtx is not None else build_model_to_window_matrix(camera)
+    view_mtx = model_to_view_mtx if model_to_view_mtx is not None else build_model_to_view_matrix(camera)
+
+    projected = model_to_window(points, window_mtx)
+    view_points = model_to_view(points, view_mtx)
+
+    screen = np.zeros((points.shape[0], 3), dtype=np.float64)
+    screen[:, 0] = projected[:, 0]
+    screen[:, 1] = projected[:, 1]
+    screen[:, 2] = np.maximum(-view_points[:, 2], 0.0)
+    return screen
+
+
+def screen_to_zbuffer_coords(
+    screen_xy: np.ndarray,
+    zbuffer: ZBuffer,
+    *,
+    clamp_to_screen: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    xy = np.asarray(screen_xy, dtype=np.float64)
+    if xy.shape[0] == 0:
+        empty = np.zeros((0,), dtype=np.float64)
+        return empty, empty
+
+    sx = xy[:, 0]
+    sy = xy[:, 1]
+    if clamp_to_screen:
+        sx = np.clip(sx, 0.0, float(max(zbuffer.screen_width - 1, 0)))
+        sy = np.clip(sy, 0.0, float(max(zbuffer.screen_height - 1, 0)))
+
+    height, width = zbuffer.depth.shape
+    if width <= 1:
+        fx = np.zeros(xy.shape[0], dtype=np.float64)
+    else:
+        denom_x = max(float(zbuffer.screen_width - 1), 1.0)
+        fx = sx * (float(width - 1) / denom_x)
+
+    if height <= 1:
+        fy = np.zeros(xy.shape[0], dtype=np.float64)
+    else:
+        denom_y = max(float(zbuffer.screen_height - 1), 1.0)
+        fy = sy * (float(height - 1) / denom_y)
+
+    return fx, fy
+
+
+def assert_zbuffer_corner_mapping(zbuffer: ZBuffer) -> None:
+    height, width = zbuffer.depth.shape
+    corners = np.asarray(
+        [
+            (0.0, 0.0),
+            (float(max(zbuffer.screen_width - 1, 0)), 0.0),
+            (0.0, float(max(zbuffer.screen_height - 1, 0))),
+            (
+                float(max(zbuffer.screen_width - 1, 0)),
+                float(max(zbuffer.screen_height - 1, 0)),
+            ),
+        ],
+        dtype=np.float64,
+    )
+    fx, fy = screen_to_zbuffer_coords(corners, zbuffer, clamp_to_screen=True)
+    expected_x = np.asarray(
+        [0.0, float(max(width - 1, 0)), 0.0, float(max(width - 1, 0))],
+        dtype=np.float64,
+    )
+    expected_y = np.asarray(
+        [0.0, 0.0, float(max(height - 1, 0)), float(max(height - 1, 0))],
+        dtype=np.float64,
+    )
+    if not np.allclose(fx, expected_x, atol=1.0e-9):
+        raise AssertionError("screen_to_zbuffer_coords x mapping mismatch at screen corners")
+    if not np.allclose(fy, expected_y, atol=1.0e-9):
+        raise AssertionError("screen_to_zbuffer_coords y mapping mismatch at screen corners")
+
+
+def build_zbuffer_conservative(
+    screen_vertices: np.ndarray,
+    faces: np.ndarray,
+    *,
+    screen_width: int,
+    screen_height: int,
+    face_mask: np.ndarray | None = None,
+    resolution: int = 1024,
+    coverage_dilation_size: int = 3,
+) -> ZBuffer:
+    screen = np.asarray(screen_vertices, dtype=np.float64)
+    tri_idx = np.asarray(faces, dtype=np.int64)
+    screen_w = max(1, int(screen_width))
+    screen_h = max(1, int(screen_height))
+    target = max(64, int(resolution))
+
+    if screen_w >= screen_h:
+        width = target
+        height = max(1, int(math.ceil(target * (float(screen_h) / float(screen_w)))))
+    else:
+        height = target
+        width = max(1, int(math.ceil(target * (float(screen_w) / float(screen_h)))))
+
+    zbuffer = np.full((height, width), np.inf, dtype=np.float64)
+    if screen.shape[0] == 0 or tri_idx.size == 0:
+        return ZBuffer(
+            depth=zbuffer,
+            screen_width=screen_w,
+            screen_height=screen_h,
+        )
+
+    if face_mask is not None:
+        mask = np.asarray(face_mask, dtype=bool)
+        if mask.shape[0] == tri_idx.shape[0]:
+            tri_idx = tri_idx[mask]
+    if tri_idx.size == 0:
+        return ZBuffer(
+            depth=zbuffer,
+            screen_width=screen_w,
+            screen_height=screen_h,
+        )
+
+    zbuffer_meta = ZBuffer(depth=zbuffer, screen_width=screen_w, screen_height=screen_h)
+    assert_zbuffer_corner_mapping(zbuffer_meta)
+    dilation_radius = max(0, (int(coverage_dilation_size) - 1) // 2)
+
+    for tri in tri_idx:
+        tri_screen = screen[tri]
+        p = tri_screen[:, :2]
+        d = tri_screen[:, 2]
+        if not np.all(np.isfinite(p)) or not np.all(np.isfinite(d)):
+            continue
+        if np.any(d <= 0.0):
+            continue
+
+        px, py = screen_to_zbuffer_coords(
+            np.column_stack((p[:, 0], p[:, 1])),
+            zbuffer_meta,
+            clamp_to_screen=True,
+        )
+        if not np.all(np.isfinite(px)) or not np.all(np.isfinite(py)):
+            continue
+        vertex_ix = np.clip(np.rint(px).astype(np.int64), 0, width - 1)
+        vertex_iy = np.clip(np.rint(py).astype(np.int64), 0, height - 1)
+        check_fx, check_fy = screen_to_zbuffer_coords(
+            p,
+            zbuffer_meta,
+            clamp_to_screen=True,
+        )
+        check_ix = np.clip(np.rint(check_fx).astype(np.int64), 0, width - 1)
+        check_iy = np.clip(np.rint(check_fy).astype(np.int64), 0, height - 1)
+        if not np.array_equal(vertex_ix, check_ix):
+            raise AssertionError("Triangle vertex x pixel mapping diverged from raster mapping")
+        if not np.array_equal(vertex_iy, check_iy):
+            raise AssertionError("Triangle vertex y pixel mapping diverged from raster mapping")
+
+        denom = ((py[1] - py[2]) * (px[0] - px[2])) + ((px[2] - px[1]) * (py[0] - py[2]))
+        if abs(float(denom)) < EPS:
+            continue
+
+        ix0 = max(0, int(math.floor(float(np.min(px)))))
+        ix1 = min(width - 1, int(math.ceil(float(np.max(px)))))
+        iy0 = max(0, int(math.floor(float(np.min(py)))))
+        iy1 = min(height - 1, int(math.ceil(float(np.max(py)))))
+        if ix1 < ix0 or iy1 < iy0:
+            continue
+
+        xs = np.arange(ix0, ix1 + 1, dtype=np.float64)
+        ys = np.arange(iy0, iy1 + 1, dtype=np.float64)
+        grid_x, grid_y = np.meshgrid(xs, ys, indexing="xy")
+
+        a = (((py[1] - py[2]) * (grid_x - px[2])) + ((px[2] - px[1]) * (grid_y - py[2]))) / denom
+        b = (((py[2] - py[0]) * (grid_x - px[2])) + ((px[0] - px[2]) * (grid_y - py[2]))) / denom
+        c = 1.0 - a - b
+        inside = (a >= -1.0e-6) & (b >= -1.0e-6) & (c >= -1.0e-6)
+        if not np.any(inside):
+            continue
+
+        tri_depth = (a * d[0]) + (b * d[1]) + (c * d[2])
+        inside_y, inside_x = np.nonzero(inside)
+        cell_x = ix0 + inside_x
+        cell_y = iy0 + inside_y
+        cell_depth = tri_depth[inside_y, inside_x]
+
+        for dy in range(-dilation_radius, dilation_radius + 1):
+            ny = np.clip(cell_y + dy, 0, height - 1)
+            for dx in range(-dilation_radius, dilation_radius + 1):
+                nx = np.clip(cell_x + dx, 0, width - 1)
+                np.minimum.at(zbuffer, (ny, nx), cell_depth)
+
+    return ZBuffer(
+        depth=zbuffer,
+        screen_width=screen_w,
+        screen_height=screen_h,
+    )
+
+
+def write_png_image(
+    png_path: Path,
+    image: np.ndarray,
+) -> None:
+    pixels = np.asarray(image, dtype=np.uint8)
+    if pixels.ndim not in (2, 3):
+        raise ValueError("PNG image must be HxW or HxWx3.")
+    if pixels.ndim == 3 and pixels.shape[2] != 3:
+        raise ValueError("RGB PNG image must have exactly 3 channels.")
+
+    height, width = pixels.shape[:2]
+    if height <= 0 or width <= 0:
+        return
+
+    color_type = 0 if pixels.ndim == 2 else 2
+    if pixels.ndim == 2:
+        raw = b"".join(
+            b"\x00" + bytes(pixels[row_idx].tolist())
+            for row_idx in range(height)
+        )
+    else:
+        raw = b"".join(
+            b"\x00" + pixels[row_idx].tobytes()
+            for row_idx in range(height)
+        )
+    compressed = zlib.compress(raw, level=9)
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + tag
+            + data
+            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        )
+
+    png = bytearray()
+    png.extend(b"\x89PNG\r\n\x1a\n")
+    png.extend(
+        chunk(
+            b"IHDR",
+            struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0),
+        )
+    )
+    png.extend(chunk(b"IDAT", compressed))
+    png.extend(chunk(b"IEND", b""))
+    Path(png_path).write_bytes(bytes(png))
+
+
+def write_zbuffer_coverage_mask_png(
+    png_path: Path,
+    zbuffer: ZBuffer,
+) -> None:
+    mask = np.where(np.isfinite(zbuffer.depth), 255, 0).astype(np.uint8)
+    write_png_image(png_path, mask)
+
+
+def write_sample_visibility_overlay_png(
+    png_path: Path,
+    zbuffer: ZBuffer,
+    sample_pixels: np.ndarray,
+    visible_mask: np.ndarray,
+) -> None:
+    base = np.where(np.isfinite(zbuffer.depth), 255, 0).astype(np.uint8)
+    image = np.repeat(base[:, :, None], 3, axis=2)
+
+    coords = np.asarray(sample_pixels, dtype=np.int64)
+    visible = np.asarray(visible_mask, dtype=bool)
+    if coords.shape[0] > 0:
+        valid = (
+            np.isfinite(coords[:, 0])
+            & np.isfinite(coords[:, 1])
+        )
+        if np.any(valid):
+            clamped_x = np.clip(coords[valid, 0], 0, image.shape[1] - 1)
+            clamped_y = np.clip(coords[valid, 1], 0, image.shape[0] - 1)
+            valid_visible = visible[valid]
+
+            culled_idx = np.where(~valid_visible)[0]
+            if culled_idx.size > 0:
+                image[clamped_y[culled_idx], clamped_x[culled_idx]] = np.asarray((255, 0, 0), dtype=np.uint8)
+
+            kept_idx = np.where(valid_visible)[0]
+            if kept_idx.size > 0:
+                image[clamped_y[kept_idx], clamped_x[kept_idx]] = np.asarray((0, 255, 0), dtype=np.uint8)
+
+    write_png_image(png_path, image)
+
+
+def visible_mask_for_edge_samples(
+    screen_samples: np.ndarray,
+    zbuffer: ZBuffer,
+    *,
+    depth_epsilon: float,
+    window_size: int = 5,
+    return_empty_mask: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    screen = np.asarray(screen_samples, dtype=np.float64)
+    if screen.shape[0] == 0:
+        empty = np.zeros((0,), dtype=bool)
+        return (empty, empty) if return_empty_mask else empty
+
+    depths = screen[:, 2]
+    valid = (
+        np.isfinite(screen[:, 0])
+        & np.isfinite(screen[:, 1])
+        & np.isfinite(depths)
+        & (depths > 0.0)
+    )
+    if zbuffer.depth.size == 0:
+        empty = valid.copy()
+        return (valid.copy(), empty) if return_empty_mask else valid.copy()
+
+    height, width = zbuffer.depth.shape
+    fx, fy = screen_to_zbuffer_coords(screen[:, :2], zbuffer)
+
+    in_bounds = (
+        (fx >= -0.5)
+        & (fx <= (width - 0.5))
+        & (fy >= -0.5)
+        & (fy <= (height - 0.5))
+    )
+
+    visible = valid.copy()
+    empty_query = valid & (~in_bounds)
+    idx = np.where(valid & in_bounds)[0]
+    if idx.size > 0:
+        ix = np.clip(np.rint(fx[idx]).astype(np.int64), 0, width - 1)
+        iy = np.clip(np.rint(fy[idx]).astype(np.int64), 0, height - 1)
+        window_radius = max(0, (int(window_size) - 1) // 2)
+        neighbor_depths: list[np.ndarray] = []
+        neighbor_oob: list[np.ndarray] = []
+        for dy in range(-window_radius, window_radius + 1):
+            raw_ny = iy + dy
+            ny = np.clip(raw_ny, 0, height - 1)
+            y_oob = (raw_ny < 0) | (raw_ny >= height)
+            for dx in range(-window_radius, window_radius + 1):
+                raw_nx = ix + dx
+                nx = np.clip(raw_nx, 0, width - 1)
+                x_oob = (raw_nx < 0) | (raw_nx >= width)
+                neighbor_depths.append(zbuffer.depth[ny, nx])
+                neighbor_oob.append(x_oob | y_oob)
+
+        neighbor_stack = np.stack(neighbor_depths, axis=1)
+        oob_stack = np.stack(neighbor_oob, axis=1)
+        finite_neighbors = (~oob_stack) & np.isfinite(neighbor_stack)
+        touches_empty = np.any(oob_stack | (~np.isfinite(neighbor_stack)), axis=1)
+        depth_floor = np.min(
+            np.where(finite_neighbors, neighbor_stack, np.inf),
+            axis=1,
+        )
+
+        empty_query[idx] = touches_empty
+        visible[idx] = touches_empty | (depths[idx] <= (depth_floor + float(depth_epsilon)))
+
+    if return_empty_mask:
+        return visible, empty_query
+    return visible
+
+
+def build_sample_visibility_lookup(
+    model_vertices: np.ndarray,
+    edges: list[Edge],
+    faces: np.ndarray,
+    camera: CameraConfig,
+    *,
+    view_points_per_unit_length: float,
+    zbuffer_resolution: int = 1024,
+    coverage_dilation_size: int = 3,
+    sample_window_size: int = 5,
+    debug_output_prefix: Path | None = None,
+) -> tuple[dict[int, np.ndarray], dict[str, float | str]]:
+    verts = np.asarray(model_vertices, dtype=np.float64)
+    if verts.shape[0] == 0 or len(edges) == 0 or len(faces) == 0:
+        return {}, {
+            "total_samples": 0.0,
+            "visible_samples": 0.0,
+            "percent_empty_zbuffer_queries": 100.0,
+            "zbuffer_coverage_ratio": 0.0,
+            "depth_epsilon": 0.0,
+        }
+
+    model_to_window_mtx = build_model_to_window_matrix(camera)
+    model_to_view_mtx = build_model_to_view_matrix(camera)
+    view_vertices = model_to_view(verts, model_to_view_mtx)
+    bbox_diag_view = max(float(np.linalg.norm(np.ptp(view_vertices, axis=0))), EPS)
+    depth_epsilon = max(bbox_diag_view * ORTHO_DEPTH_EPSILON_FACTOR, bbox_diag_view * 1.0e-7)
+
+    screen_vertices = project_to_screen(
+        verts,
+        camera,
+        model_to_window_mtx=model_to_window_mtx,
+        model_to_view_mtx=model_to_view_mtx,
+    )
+    zbuffer = build_zbuffer_conservative(
+        screen_vertices=screen_vertices,
+        faces=faces,
+        screen_width=int(camera.canvas_width),
+        screen_height=int(camera.canvas_height),
+        resolution=zbuffer_resolution,
+        coverage_dilation_size=coverage_dilation_size,
+    )
+
+    sample_visibility_by_edge: dict[int, np.ndarray] = {}
+    total_samples = 0
+    visible_samples = 0
+    empty_queries = 0
+    debug_sample_pixels: list[np.ndarray] = []
+    debug_sample_visible: list[np.ndarray] = []
+
+    for edge in edges:
+        model_points = sample_edge_model_points(
+            model_vertices=model_vertices,
+            edge=edge,
+            view_points_per_unit_length=view_points_per_unit_length,
+        )
+        screen_samples = project_to_screen(
+            model_points,
+            camera,
+            model_to_window_mtx=model_to_window_mtx,
+            model_to_view_mtx=model_to_view_mtx,
+        )
+        visible_mask, empty_mask = visible_mask_for_edge_samples(
+            screen_samples,
+            zbuffer,
+            depth_epsilon=depth_epsilon,
+            window_size=sample_window_size,
+            return_empty_mask=True,
+        )
+        sample_visibility_by_edge[int(edge.edge_id)] = np.asarray(visible_mask, dtype=bool)
+        total_samples += int(screen_samples.shape[0])
+        visible_samples += int(np.count_nonzero(visible_mask))
+        empty_queries += int(np.count_nonzero(empty_mask))
+
+        if debug_output_prefix is not None and screen_samples.shape[0] > 0:
+            sample_fx, sample_fy = screen_to_zbuffer_coords(
+                screen_samples[:, :2],
+                zbuffer,
+                clamp_to_screen=True,
+            )
+            sample_ix = np.clip(np.rint(sample_fx).astype(np.int64), 0, zbuffer.depth.shape[1] - 1)
+            sample_iy = np.clip(np.rint(sample_fy).astype(np.int64), 0, zbuffer.depth.shape[0] - 1)
+            debug_sample_pixels.append(np.column_stack((sample_ix, sample_iy)))
+            debug_sample_visible.append(np.asarray(visible_mask, dtype=bool))
+
+    coverage_ratio = 0.0
+    if zbuffer.depth.size > 0:
+        coverage_ratio = float(np.count_nonzero(np.isfinite(zbuffer.depth))) / float(zbuffer.depth.size)
+
+    stats = {
+        "total_samples": float(total_samples),
+        "visible_samples": float(visible_samples),
+        "percent_empty_zbuffer_queries": (100.0 * float(empty_queries) / float(total_samples)) if total_samples > 0 else 100.0,
+        "zbuffer_coverage_ratio": coverage_ratio,
+        "depth_epsilon": depth_epsilon,
+    }
+
+    if debug_output_prefix is not None:
+        prefix = Path(debug_output_prefix)
+        coverage_path = prefix.parent / f"{prefix.name}_coverage.png"
+        samples_path = prefix.parent / f"{prefix.name}_samples.png"
+        write_zbuffer_coverage_mask_png(coverage_path, zbuffer)
+        if debug_sample_pixels:
+            overlay_pixels = np.vstack(debug_sample_pixels)
+            overlay_visible = np.concatenate(debug_sample_visible)
+        else:
+            overlay_pixels = np.zeros((0, 2), dtype=np.int64)
+            overlay_visible = np.zeros((0,), dtype=bool)
+        write_sample_visibility_overlay_png(samples_path, zbuffer, overlay_pixels, overlay_visible)
+        stats["coverage_debug_png"] = str(coverage_path)
+        stats["sample_debug_png"] = str(samples_path)
+
+    return sample_visibility_by_edge, stats
+
+
 def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float, float, float]:
     distance_from_canvas = float(point_zero[2] - n_view)
     center_x = float(point_zero[0])
@@ -319,6 +848,19 @@ def get_edge_points(
     return zero_start + (zero_end - zero_start) * fractions[:, None]
 
 
+def sample_edge_model_points(
+    model_vertices: np.ndarray,
+    edge: Edge,
+    view_points_per_unit_length: float,
+) -> np.ndarray:
+    model_start = np.asarray(model_vertices[edge.start_idx], dtype=np.float64)
+    model_end = np.asarray(model_vertices[edge.end_idx], dtype=np.float64)
+    length_model = float(np.linalg.norm(model_end - model_start))
+    num_points = max(2, int(float(view_points_per_unit_length) * length_model))
+    fractions = np.linspace(0.0, 1.0, num_points)
+    return model_start + ((model_end - model_start) * fractions[:, None])
+
+
 def generate_arcs(
     model_vertices: np.ndarray,
     zero_vertices: np.ndarray,
@@ -329,6 +871,9 @@ def generate_arcs(
     min_arc_radius: float,
     arc_mode: str = "semi",
     ellipse_ratio: float = 0.65,
+    model_to_window_mtx: np.ndarray | None = None,
+    model_to_view_mtx: np.ndarray | None = None,
+    sample_visibility_by_edge: dict[int, np.ndarray] | None = None,
 ) -> list[Arc]:
     seen_coords: set[str] = set()
     seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
@@ -340,20 +885,31 @@ def generate_arcs(
     ell_ratio = max(0.15, min(1.0, float(ellipse_ratio)))
 
     for edge in edges:
-        model_start = model_vertices[edge.start_idx]
-        model_end = model_vertices[edge.end_idx]
-        zero_start = zero_vertices[edge.start_idx]
-        zero_end = zero_vertices[edge.end_idx]
-
-        points = get_edge_points(
-            model_start=model_start,
-            model_end=model_end,
-            zero_start=zero_start,
-            zero_end=zero_end,
+        model_points = sample_edge_model_points(
+            model_vertices=model_vertices,
+            edge=edge,
             view_points_per_unit_length=view_points_per_unit_length,
         )
+        if model_to_window_mtx is not None:
+            points = model_to_window(model_points, model_to_window_mtx)
+        else:
+            zero_start = zero_vertices[edge.start_idx]
+            zero_end = zero_vertices[edge.end_idx]
+            points = get_edge_points(
+                model_start=model_points[0],
+                model_end=model_points[-1],
+                zero_start=zero_start,
+                zero_end=zero_end,
+                view_points_per_unit_length=view_points_per_unit_length,
+            )
 
-        for point in points:
+        edge_visibility = None
+        if sample_visibility_by_edge is not None:
+            edge_visibility = sample_visibility_by_edge.get(int(edge.edge_id))
+
+        for sample_idx, point in enumerate(points):
+            if edge_visibility is not None and sample_idx < edge_visibility.shape[0] and not bool(edge_visibility[sample_idx]):
+                continue
             coord_hash = (
                 f"{point[0]:.{dedupe_decimals}f}:"
                 f"{point[1]:.{dedupe_decimals}f}:"
@@ -1105,10 +1661,32 @@ def run(args: argparse.Namespace) -> int:
     )
 
     model_to_window_mtx = build_model_to_window_matrix(camera)
+    model_to_view_mtx = build_model_to_view_matrix(camera)
     zero_vertices = model_to_window(model_vertices, model_to_window_mtx)
     pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), model_to_window_mtx)[0]
     n_view = float(pr_view[2])
 
+    arcs_all = generate_arcs(
+        model_vertices=model_vertices,
+        zero_vertices=zero_vertices,
+        edges=edges,
+        view_points_per_unit_length=pipeline.line_resolution,
+        n_view=n_view,
+        dedupe_decimals=pipeline.dedupe_decimals,
+        min_arc_radius=pipeline.min_arc_radius,
+        arc_mode=pipeline.arc_mode,
+        ellipse_ratio=pipeline.ellipse_ratio,
+        model_to_window_mtx=model_to_window_mtx,
+        model_to_view_mtx=model_to_view_mtx,
+    )
+    sample_visibility_by_edge, _vis_stats = build_sample_visibility_lookup(
+        model_vertices=model_vertices,
+        edges=edges,
+        faces=model_faces,
+        camera=camera,
+        view_points_per_unit_length=pipeline.line_resolution,
+        zbuffer_resolution=1024,
+    )
     arcs = generate_arcs(
         model_vertices=model_vertices,
         zero_vertices=zero_vertices,
@@ -1119,6 +1697,9 @@ def run(args: argparse.Namespace) -> int:
         min_arc_radius=pipeline.min_arc_radius,
         arc_mode=pipeline.arc_mode,
         ellipse_ratio=pipeline.ellipse_ratio,
+        model_to_window_mtx=model_to_window_mtx,
+        model_to_view_mtx=model_to_view_mtx,
+        sample_visibility_by_edge=sample_visibility_by_edge,
     )
 
     write_svg(args.svg, arcs, stroke_width=pipeline.stroke_width)
@@ -1151,13 +1732,159 @@ def run(args: argparse.Namespace) -> int:
 
     print(f"[OK] STL loaded: {args.stl}")
     print(f"[OK] Unique edges: {len(edges)}")
-    print(f"[OK] Arcs generated: {len(arcs)}")
+    print(f"[OK] Arcs generated: {len(arcs_all)}")
+    print(f"[OK] Arcs visible after cull: {len(arcs)}")
     print(f"[OK] SVG saved: {args.svg}")
     if args.simulate_html is not None:
         print(f"[OK] Simulation HTML saved: {args.simulate_html}")
     if args.json is not None:
         print(f"[OK] JSON saved: {args.json}")
     return 0
+
+
+def unit_cube_visibility_cull_smoke_test() -> dict[str, int]:
+    if np is None:
+        raise RuntimeError("numpy is required for the visibility smoke test.")
+
+    cube_vertices = np.asarray(
+        [
+            (0.5, -0.5, -0.5),
+            (0.5, 0.5, -0.5),
+            (0.5, 0.5, 0.5),
+            (0.5, -0.5, 0.5),
+            (-0.5, -0.5, -0.5),
+            (-0.5, 0.5, -0.5),
+            (-0.5, 0.5, 0.5),
+            (-0.5, -0.5, 0.5),
+        ],
+        dtype=np.float64,
+    )
+    cube_faces = np.asarray(
+        [
+            (0, 1, 2),
+            (0, 2, 3),
+            (4, 6, 5),
+            (4, 7, 6),
+            (1, 5, 6),
+            (1, 6, 2),
+            (0, 3, 7),
+            (0, 7, 4),
+            (3, 2, 6),
+            (3, 6, 7),
+            (0, 4, 5),
+            (0, 5, 1),
+        ],
+        dtype=np.int64,
+    )
+    cube_edges = [
+        Edge(edge_id=0, start_idx=0, end_idx=1),
+        Edge(edge_id=1, start_idx=1, end_idx=2),
+        Edge(edge_id=2, start_idx=2, end_idx=3),
+        Edge(edge_id=3, start_idx=3, end_idx=0),
+        Edge(edge_id=4, start_idx=4, end_idx=5),
+        Edge(edge_id=5, start_idx=5, end_idx=6),
+        Edge(edge_id=6, start_idx=6, end_idx=7),
+        Edge(edge_id=7, start_idx=7, end_idx=4),
+        Edge(edge_id=8, start_idx=0, end_idx=4),
+        Edge(edge_id=9, start_idx=1, end_idx=5),
+        Edge(edge_id=10, start_idx=2, end_idx=6),
+        Edge(edge_id=11, start_idx=3, end_idx=7),
+    ]
+    camera = CameraConfig(
+        po=(4.0, 0.0, 0.0),
+        pr=(0.0, 0.0, 0.0),
+        look_up=(0.0, 0.0, 1.0),
+        current_scale=1.0,
+        zf=8.0,
+        canvas_width=640,
+        canvas_height=640,
+    )
+
+    model_to_window_mtx = build_model_to_window_matrix(camera)
+    model_to_view_mtx = build_model_to_view_matrix(camera)
+    projected = model_to_window(cube_vertices, model_to_window_mtx)
+    pr_view = model_to_window(np.asarray([camera.pr], dtype=np.float64), model_to_window_mtx)[0]
+    n_view = float(pr_view[2])
+
+    arcs_before = generate_arcs(
+        model_vertices=cube_vertices,
+        zero_vertices=projected,
+        edges=cube_edges,
+        view_points_per_unit_length=20.0,
+        n_view=n_view,
+        dedupe_decimals=6,
+        min_arc_radius=0.0,
+        arc_mode="semi",
+        ellipse_ratio=1.0,
+        model_to_window_mtx=model_to_window_mtx,
+        model_to_view_mtx=model_to_view_mtx,
+    )
+    sample_visibility_by_edge, vis_stats = build_sample_visibility_lookup(
+        model_vertices=cube_vertices,
+        edges=cube_edges,
+        faces=cube_faces,
+        camera=camera,
+        view_points_per_unit_length=20.0,
+        zbuffer_resolution=1024,
+        coverage_dilation_size=3,
+        sample_window_size=5,
+        debug_output_prefix=Path(__file__).resolve().with_name("unit_cube_visibility_debug"),
+    )
+    arcs_after = generate_arcs(
+        model_vertices=cube_vertices,
+        zero_vertices=projected,
+        edges=cube_edges,
+        view_points_per_unit_length=20.0,
+        n_view=n_view,
+        dedupe_decimals=6,
+        min_arc_radius=0.0,
+        arc_mode="semi",
+        ellipse_ratio=1.0,
+        model_to_window_mtx=model_to_window_mtx,
+        model_to_view_mtx=model_to_view_mtx,
+        sample_visibility_by_edge=sample_visibility_by_edge,
+    )
+
+    back_edge_ids = {4, 5, 6, 7}
+    back_before = sum(1 for arc in arcs_before if arc.edge_id in back_edge_ids)
+    back_after = sum(1 for arc in arcs_after if arc.edge_id in back_edge_ids)
+
+    print(
+        "Unit cube visibility test | "
+        f"edges={len(cube_edges)} | samples before={len(arcs_before)} | samples after={len(arcs_after)}"
+    )
+    print(f"Before: {len(arcs_before)} arcs; After cull: {len(arcs_after)} arcs")
+    print(
+        "Stats | "
+        f"total_samples={int(vis_stats['total_samples'])} | "
+        f"visible_samples={int(vis_stats['visible_samples'])} | "
+        f"percent_empty_zbuffer_queries={vis_stats['percent_empty_zbuffer_queries']:.2f}% | "
+        f"zbuffer_coverage_ratio={vis_stats['zbuffer_coverage_ratio']:.4f}"
+    )
+    if "coverage_debug_png" in vis_stats and "sample_debug_png" in vis_stats:
+        print(
+            "Debug PNGs | "
+            f"coverage={vis_stats['coverage_debug_png']} | "
+            f"samples={vis_stats['sample_debug_png']}"
+        )
+    print(f"Far-side back-face samples kept: {back_after}/{back_before}")
+
+    if back_before <= 0:
+        raise AssertionError("Cube smoke test did not generate any back-face edge samples.")
+    if back_after != 0:
+        raise AssertionError("Far-side cube edges should be fully culled in the front-on view.")
+    if len(arcs_after) <= 0 or len(arcs_after) >= len(arcs_before):
+        raise AssertionError("Visibility culling should keep some arcs but remove occluded ones.")
+
+    return {
+        "edge_count": len(cube_edges),
+        "arcs_before": len(arcs_before),
+        "arcs_after": len(arcs_after),
+        "back_before": back_before,
+        "back_after": back_after,
+        "total_samples": int(vis_stats["total_samples"]),
+        "visible_samples": int(vis_stats["visible_samples"]),
+    }
 
 
 def main() -> int:

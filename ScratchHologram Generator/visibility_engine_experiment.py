@@ -523,6 +523,7 @@ def run(args: argparse.Namespace) -> int:
         min_arc_radius=float(args.min_arc_radius),
         arc_mode=str(args.arc_mode),
         ellipse_ratio=float(args.ellipse_ratio),
+        model_to_window_mtx=mtx,
     )
 
     vis_cfg = VisibilityConfig(
