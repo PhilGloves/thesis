@@ -1,13 +1,33 @@
 #!/usr/bin/env python3
 """
-Scratch Hologram Desktop App (single view, performance-oriented).
+Scratch hologram desktop interface.
 
-What this app does:
-- Load STL.
-- Orbit camera (drag + wheel).
-- Show arc preview in one canvas.
-- Reintroduce View Angle simulation overlay (profile lines).
-- Export SVG from current view.
+Pipeline stage
+--------------
+This module is the interactive front-end for the scratch hologram pipeline. It
+loads a mesh, controls camera orbit and projection, previews edge sampling and
+arc generation, and exports the current view as SVG or G-code.
+
+Input / output
+--------------
+Input is a mesh selected by the user plus interactive parameters such as edge
+sampling density, projection orientation, arc generation mode, and visibility
+cull enable/disable. Output is an on-screen preview and exported SVG or G-code
+derived from the same current camera view.
+
+Key parameters
+--------------
+`line_resolution` controls edge sampling density, `view_angle` controls the
+simulated profile overlay, `arc_mode` selects semicircular or elliptic arc
+generation, and the camera yaw/pitch/zoom determine the projection.
+
+Coordinate conventions
+----------------------
+Model coordinates are inherited from `scratch_pipeline.py` and remain in mesh
+units. The preview canvas uses screen-space pixels with `x` rightward and `y`
+downward. The camera view direction points from the camera origin to the mesh
+center, while exported SVG and G-code reuse the same projected arc generation
+geometry to avoid mismatches between preview and fabrication.
 """
 
 from __future__ import annotations
@@ -38,6 +58,32 @@ from scratch_pipeline import (
 
 
 def clamp(value: float, low: float, high: float) -> float:
+    """
+    Clamp a scalar to a closed interval.
+
+    Parameters
+    ----------
+    value : float
+        Input scalar, any unit.
+    low : float
+        Lower bound, same unit as `value`.
+    high : float
+        Upper bound, same unit as `value`.
+
+    Returns
+    -------
+    float
+        Clamped scalar.
+
+    Notes
+    -----
+    This helper is reused for camera controls and UI normalization.
+
+    Assumptions
+    -----------
+    `low <= high`.
+    """
+
     return max(low, min(high, value))
 
 
@@ -48,10 +94,34 @@ def point_at_angle_projected(
     ellipse_ratio: float = 1.0,
 ) -> tuple[float, float]:
     """
-    Scratch-hologram style profile point.
+    Map one projected point onto the simulated scratch profile.
 
-    Instead of rigidly rotating the model, each projected point moves along the
-    same arc family used for scratch generation, controlled by view angle.
+    Parameters
+    ----------
+    p : np.ndarray | tuple[float, float, float]
+        Projected point `(x, y, z)` in screen coordinates.
+    angle_deg : float
+        Simulated profile angle in degrees.
+    n_view : float
+        Projected depth of the camera target point.
+    ellipse_ratio : float, optional
+        Vertical scaling factor for elliptic profile motion.
+
+    Returns
+    -------
+    tuple[float, float]
+        Simulated profile point in screen pixels.
+
+    Notes
+    -----
+    The design decision is to move each projected point along the same arc
+    family used for arc generation instead of re-projecting a rotated mesh; the
+    trade-off is a faster, visually coherent preview rather than a strict 3-D
+    rigid transformation.
+
+    Assumptions
+    -----------
+    `angle_deg` is interpreted in the interval `[-90, 90]`.
     """
     dist = float(p[2]) - n_view
     cx = float(p[0])
@@ -73,6 +143,32 @@ def point_at_angle_projected(
 
 
 def sample_arc_polyline(arc: Arc, max_segment_units: float) -> list[tuple[float, float]]:
+    """
+    Approximate one arc with a polyline for G-code export.
+
+    Parameters
+    ----------
+    arc : Arc
+        Screen-space arc to approximate.
+    max_segment_units : float
+        Maximum polyline segment length in screen units.
+
+    Returns
+    -------
+    list[tuple[float, float]]
+        Polyline vertices in screen coordinates.
+
+    Notes
+    -----
+    Polyline sampling is used only when exact circular G-code is not suitable.
+    The trade-off is larger G-code output in exchange for broader geometry
+    support, especially for elliptic arc generation.
+
+    Assumptions
+    -----------
+    `arc` uses the same angle convention as the Tk preview.
+    """
+
     rx = max(float(arc.rect_w) / 2.0, 0.5)
     ry = max(float(arc.rect_h) / 2.0, 0.5)
     cx = float(arc.rect_x) + (float(arc.rect_w) / 2.0)
@@ -112,6 +208,51 @@ def write_gcode(
     invert_y: bool,
     arc_mode: str,
 ) -> tuple[int, int, float]:
+    """
+    Export the current arc set as planar G-code.
+
+    Parameters
+    ----------
+    gcode_path : Path
+        Destination file path.
+    arcs : list[Arc]
+        Screen-space arcs selected for export.
+    target_width_mm : float
+        Final engraved width in millimeters.
+    safe_z_mm : float
+        Clearance height in millimeters.
+    cut_z_mm : float
+        Cutting height in millimeters.
+    feed_xy_mm_min : float
+        XY feed rate in millimeters per minute.
+    feed_z_mm_min : float
+        Z feed rate in millimeters per minute.
+    max_segment_mm : float
+        Maximum segment length for polyline fallback in millimeters.
+    spindle_rpm : int
+        Spindle speed in revolutions per minute. `0` suppresses spindle codes.
+    invert_y : bool
+        If True, flips Y to match CNC axis conventions.
+    arc_mode : str
+        Arc generation mode used upstream.
+
+    Returns
+    -------
+    tuple[int, int, float]
+        Path count, motion segment count, and cumulative cutting length in
+        millimeters.
+
+    Notes
+    -----
+    Circular commands are emitted only for near-circular semicircular arc
+    generation. The trade-off is simpler, shorter G-code when possible, with a
+    polyline fallback for robustness and elliptic geometry.
+
+    Assumptions
+    -----------
+    `arcs` already matches the current projection and visibility decisions.
+    """
+
     if len(arcs) == 0:
         raise ValueError("Nessun arco disponibile per esportare G-code.")
     if target_width_mm <= 0.0:
@@ -246,7 +387,54 @@ def write_gcode(
 
 
 class ScratchDesktopApp:
+    """
+    Interactive desktop controller for mesh loading, projection, and export.
+
+    Parameters
+    ----------
+    root : tk.Tk
+        Root Tk application object.
+
+    Returns
+    -------
+    None
+        The class manages stateful UI interaction.
+
+    Notes
+    -----
+    The desktop app keeps preview, SVG export, and G-code export on the same
+    projection and arc generation path. This design decision avoids mismatched
+    outputs; the trade-off is that preview recomputation must stay efficient.
+
+    Assumptions
+    -----------
+    Tkinter is available and running on the main thread.
+    """
+
     def __init__(self, root: tk.Tk) -> None:
+        """
+        Initialize application state, fixed defaults, and the UI.
+
+        Parameters
+        ----------
+        root : tk.Tk
+            Root Tk application object.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Several controls are intentionally fixed to reduce UI complexity. The
+        trade-off is fewer tuning knobs in exchange for a more reproducible
+        preview-to-export workflow.
+
+        Assumptions
+        -----------
+        `root` has not been destroyed before initialization completes.
+        """
+
         self.root = root
         self.root.title("ScratchHologram Generator Desktop")
         self.root.geometry("1500x940")
@@ -504,6 +692,29 @@ class ScratchDesktopApp:
         combo.bind("<<ComboboxSelected>>", on_change)
 
     def schedule_recompute(self, delay_ms: int = 120) -> None:
+        """
+        Debounce preview recomputation after a UI interaction.
+
+        Parameters
+        ----------
+        delay_ms : int, optional
+            Delay before recomputation in milliseconds.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Debouncing is a design decision that keeps the UI responsive while
+        dragging or adjusting projection controls; the trade-off is that the
+        preview can lag slightly behind rapid input.
+
+        Assumptions
+        -----------
+        The Tk event loop is active.
+        """
+
         if self.pending_recompute is not None:
             self.root.after_cancel(self.pending_recompute)
         self.pending_recompute = self.root.after(delay_ms, lambda: self.recompute_and_redraw(interactive=False))
@@ -519,6 +730,27 @@ class ScratchDesktopApp:
         self.recompute_and_redraw(interactive=False)
 
     def open_stl_dialog(self) -> None:
+        """
+        Open a file dialog and load a mesh selected by the user.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The dialog is limited to STL by default because the downstream mesh
+        pipeline is optimized for STL-based scratch hologram workflows.
+
+        Assumptions
+        -----------
+        The current process has permission to read the selected file.
+        """
+
         filename = filedialog.askopenfilename(
             title="Apri STL",
             initialdir=str(Path.cwd()),
@@ -528,6 +760,30 @@ class ScratchDesktopApp:
             self.load_stl(Path(filename))
 
     def load_stl(self, stl_path: Path) -> None:
+        """
+        Load a mesh and initialize derived state for preview and export.
+
+        Parameters
+        ----------
+        stl_path : Path
+            Path to the input mesh file.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The method caches mesh statistics used by edge sampling, projection, and
+        G-code defaults. Doing this once is a design decision because it avoids
+        repeated work during preview updates; the trade-off is more state kept in
+        memory.
+
+        Assumptions
+        -----------
+        The selected file is readable and contains a valid triangular mesh.
+        """
+
         try:
             ensure_dependencies()
             mesh = load_mesh(stl_path)
@@ -566,11 +822,56 @@ class ScratchDesktopApp:
         self.recompute_and_redraw(interactive=False)
 
     def on_mouse_down(self, event: tk.Event) -> None:
+        """
+        Start camera drag interaction.
+
+        Parameters
+        ----------
+        event : tk.Event
+            Mouse press event in canvas pixel coordinates.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The handler stores the last cursor position so later drag events can
+        update the projection incrementally.
+
+        Assumptions
+        -----------
+        The event originates from the preview canvas.
+        """
+
         self.dragging = True
         self.drag_last_x = int(event.x)
         self.drag_last_y = int(event.y)
 
     def on_mouse_drag(self, event: tk.Event) -> None:
+        """
+        Update camera yaw and pitch during drag interaction.
+
+        Parameters
+        ----------
+        event : tk.Event
+            Mouse motion event in canvas pixel coordinates.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The handler uses a fast preview path while dragging. The design decision
+        preserves responsiveness, while the trade-off is temporary reduction in
+        edge sampling density and arc generation fidelity.
+
+        Assumptions
+        -----------
+        Dragging has already been initialized by `on_mouse_down`.
+        """
+
         if self.model_vertices is None or not self.dragging:
             return
         x = int(event.x)
@@ -588,10 +889,55 @@ class ScratchDesktopApp:
         self.schedule_recompute(delay_ms=180)
 
     def on_mouse_up(self, _: tk.Event) -> None:
+        """
+        Finish camera drag interaction and trigger a full preview refresh.
+
+        Parameters
+        ----------
+        _ : tk.Event
+            Mouse release event (unused).
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Releasing the mouse switches back from the fast preview path to the full
+        projection and arc generation path.
+
+        Assumptions
+        -----------
+        The release event corresponds to a prior drag interaction.
+        """
+
         self.dragging = False
         self.recompute_and_redraw(interactive=False)
 
     def on_mouse_wheel(self, event: tk.Event) -> None:
+        """
+        Update the projection zoom in response to the mouse wheel.
+
+        Parameters
+        ----------
+        event : tk.Event
+            Mouse wheel event containing a signed delta.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Zoom is implemented as projection scaling rather than camera dolly. The
+        design decision keeps the scratch pattern shape more stable, while the
+        trade-off is a less physically faithful camera model.
+
+        Assumptions
+        -----------
+        The event originates from the preview canvas.
+        """
+
         if self.model_vertices is None:
             return
         if int(event.delta) > 0:
@@ -688,6 +1034,30 @@ class ScratchDesktopApp:
         return clamp(float(self.ellipse_ratio.get()), 0.20, 1.00)
 
     def recompute_and_redraw(self, interactive: bool) -> None:
+        """
+        Recompute projection, visibility, edge sampling, and arc generation.
+
+        Parameters
+        ----------
+        interactive : bool
+            If True, uses a reduced-quality preview path intended for drag/zoom
+            interaction.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        The fast interactive mode deliberately reduces edge sampling and draw
+        load to preserve responsiveness. The trade-off is lower preview fidelity
+        until the deferred full recomputation completes.
+
+        Assumptions
+        -----------
+        A mesh has already been loaded when full processing is expected.
+        """
+
         self.pending_recompute = None
         self.canvas.delete("all")
 
@@ -852,6 +1222,27 @@ class ScratchDesktopApp:
             )
 
     def redraw_from_cache(self) -> None:
+        """
+        Redraw the preview using cached projection and arc generation results.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        This avoids recomputing projection or edge sampling when only display
+        toggles change, which is faster but depends on cached state coherence.
+
+        Assumptions
+        -----------
+        Cached preview data is still valid for the current UI state.
+        """
+
         self.canvas.delete("all")
         if self.model_vertices is None:
             return
@@ -1045,6 +1436,28 @@ class ScratchDesktopApp:
         }
 
     def export_svg_dialog(self) -> None:
+        """
+        Export the current view as SVG using the active arc generation settings.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        Export reuses the current projection and visibility decisions so SVG
+        matches the preview. The trade-off is that export depends on the same
+        cached state management used by the UI.
+
+        Assumptions
+        -----------
+        A mesh is loaded and the user selects a writable destination path.
+        """
+
         if self.model_vertices is None or self.stl_path is None:
             messagebox.showwarning("Nessun modello", "Carica prima un file STL.")
             return
@@ -1081,6 +1494,30 @@ class ScratchDesktopApp:
         )
 
     def export_gcode_dialog(self) -> None:
+        """
+        Export the current view as G-code using the active arc generation settings.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        G-code export uses the same projected arc set as SVG export so
+        fabrication matches the preview. The trade-off is that fabrication
+        output remains tied to screen-space arc generation rather than direct
+        machining of the mesh itself.
+
+        Assumptions
+        -----------
+        A mesh is loaded, at least one arc is available, and the destination
+        path is writable.
+        """
+
         if self.model_vertices is None or self.stl_path is None:
             messagebox.showwarning("Nessun modello", "Carica prima un file STL.")
             return
@@ -1145,6 +1582,28 @@ class ScratchDesktopApp:
 
 
 def main() -> int:
+    """
+    Launch the scratch hologram desktop application.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    int
+        Process exit code.
+
+    Notes
+    -----
+    A default cube mesh is loaded when available so the preview is immediately
+    useful for debugging projection and arc generation.
+
+    Assumptions
+    -----------
+    Tkinter can create a window in the current environment.
+    """
+
     root = tk.Tk()
     app = ScratchDesktopApp(root)
 
@@ -1156,5 +1615,25 @@ def main() -> int:
     return 0
 
 
+# Thesis extraction notes
+# -----------------------
+# 1. Load the mesh once, then cache mesh topology for repeated projection updates.
+# 2. Build an orbiting camera from yaw, pitch, and zoom to drive the current projection.
+# 3. Reduce edge sampling density during interaction, then restore full quality after debounce.
+# 4. Reuse the same projection path for preview, SVG export, and G-code export.
+# 5. Apply visibility culling before arc generation so hidden edge samples do not emit arcs.
+# 6. Generate screen-space arcs from visible edge sampling points only.
+# 7. Draw the scratch pattern and a simulated profile overlay from the same projected data.
+# 8. Export SVG directly from the current arc set to keep preview/export consistency.
+# 9. Export G-code from the same arc set, using circular moves when arc generation is near-circular.
+#
+# Useful figures/snippets
+# -----------------------
+# - `_build_camera`: orbit camera parameterization for projection.
+# - `_preview_params`: quality scaling for interactive edge sampling.
+# - `recompute_and_redraw`: full preview pipeline orchestration.
+# - `_visibility_sample_lookup`: bridge to the visibility cull in `scratch_pipeline.py`.
+# - `export_svg_dialog` / `export_gcode_dialog`: identical source-of-truth export path.
+#
 if __name__ == "__main__":
     raise SystemExit(main())

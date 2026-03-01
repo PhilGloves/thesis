@@ -20,3 +20,8 @@ __pycache__/
 *.nc
 *.pyc
 ScratchHolograms-master
+
+.aux
+.log
+.gz
+.toc

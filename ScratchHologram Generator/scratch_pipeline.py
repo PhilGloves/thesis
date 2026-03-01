@@ -1,9 +1,36 @@
 #!/usr/bin/env python3
 """
-Arc-based scratch hologram generator.
+Scratch hologram computational pipeline.
 
-Goal: replicate HoloZens-style arc output from STL edges.
-This script generates only arcs (no lines/profiles).
+Pipeline stage
+--------------
+This module converts a triangular mesh into sampled scratch arcs, then exports
+the resulting pattern as SVG, optional diagnostic JSON, optional simulation
+HTML, and optional G-code through the desktop application layer.
+
+Input / output
+--------------
+Input is a triangular mesh (typically STL) plus a camera configuration and arc
+generation parameters. Output is a sampled set of scratch arcs in screen space,
+with optional visibility diagnostics derived from a conservative Z-buffer.
+
+Key parameters
+--------------
+`line_resolution` controls edge sampling density in samples per model unit.
+`min_arc_radius` rejects small projected arcs to limit manufacturing noise.
+`arc_mode` selects semicircular or elliptic arc generation.
+`zf` and `current_scale` control the projection model and effective zoom.
+
+Coordinate conventions
+----------------------
+Model coordinates are assumed to be right-handed and expressed in mesh units
+(typically millimeters, but the pipeline treats them as generic metric units).
+The camera target is `pr`, the camera origin is `po`, and the viewing direction
+in model space points from `po` toward `pr`. View-space `+z` points backward
+toward the camera, so visible geometry in front of the camera has negative
+view-space `z`; screen-space depth therefore uses `-z_view` as a positive
+distance-like quantity. Screen-space `x` grows rightward, screen-space `y`
+grows downward after the window transform to match Tk/SVG raster conventions.
 """
 
 from __future__ import annotations
@@ -28,13 +55,56 @@ except ImportError:  # pragma: no cover
     trimesh = None
 
 
+# WARNING: this epsilon is intentionally small because it is reused in matrix
+# normalization and geometric predicates; increasing it improves robustness but
+# risks hiding thin geometry.
 EPS = 1e-12
+# WARNING: rounding is a design decision used to merge nearly coincident mesh
+# vertices; the trade-off is better edge stability at the cost of small detail.
 NORMAL_TOLERANCE_DECIMALS = 4
+# WARNING: the visibility cull uses a deliberately conservative orthographic
+# depth tolerance; the trade-off is fewer holes on visible faces at the cost of
+# some false positives near silhouettes.
 ORTHO_DEPTH_EPSILON_FACTOR = 2.0e-2
 
 
 @dataclass
 class CameraConfig:
+    """
+    Camera parameters shared by projection and visibility stages.
+
+    Parameters
+    ----------
+    po : tuple[float, float, float]
+        Camera origin in model units.
+    pr : tuple[float, float, float]
+        Camera target point in model units.
+    look_up : tuple[float, float, float]
+        Approximate up vector used to build the camera basis.
+    current_scale : float
+        Screen scaling factor, dimensionless.
+    zf : float
+        Perspective denominator used by the projective transform, in model
+        units. Large values approximate orthographic projection.
+    canvas_width : int
+        Output viewport width in pixels.
+    canvas_height : int
+        Output viewport height in pixels.
+
+    Returns
+    -------
+    None
+        Dataclass container.
+
+    Notes
+    -----
+    The view direction points from `po` to `pr`.
+
+    Assumptions
+    -----------
+    `look_up` must not be collinear with the viewing direction.
+    """
+
     po: tuple[float, float, float]
     pr: tuple[float, float, float]
     look_up: tuple[float, float, float]
@@ -46,6 +116,41 @@ class CameraConfig:
 
 @dataclass
 class PipelineConfig:
+    """
+    Scalar parameters controlling edge sampling, projection filtering, and export.
+
+    Parameters
+    ----------
+    line_resolution : float
+        Edge sampling density in samples per model unit.
+    auto_center : bool
+        If True, shifts the mesh so the front-most `z` plane is mapped to
+        `z = 0` before projection.
+    stroke_width : float
+        SVG stroke width in screen units (pixels in the generated viewBox).
+    dedupe_decimals : int
+        Decimal precision used for projected-sample deduplication.
+    min_arc_radius : float
+        Minimum projected arc radius in pixels.
+    arc_mode : str
+        Arc generation mode: `"semi"` or `"elliptic"`.
+    ellipse_ratio : float
+        Height/width ratio for elliptic arc generation, dimensionless.
+
+    Returns
+    -------
+    None
+        Dataclass container.
+
+    Notes
+    -----
+    Parameters are evaluated after mesh loading and before SVG generation.
+
+    Assumptions
+    -----------
+    The caller validates ranges before execution.
+    """
+
     line_resolution: float
     auto_center: bool
     stroke_width: float
@@ -57,6 +162,36 @@ class PipelineConfig:
 
 @dataclass
 class Edge:
+    """
+    Topological mesh edge used by edge sampling and arc generation.
+
+    Parameters
+    ----------
+    edge_id : int
+        Stable edge identifier.
+    start_idx : int
+        Start vertex index in the remapped mesh vertex array.
+    end_idx : int
+        End vertex index in the remapped mesh vertex array.
+    normal : tuple[float, float, float], optional
+        Averaged edge normal in model coordinates, dimensionless.
+
+    Returns
+    -------
+    None
+        Dataclass container.
+
+    Notes
+    -----
+    The edge is treated as undirected for topology, but `start_idx` and
+    `end_idx` preserve a stable ordering for reproducible edge sampling.
+
+    Assumptions
+    -----------
+    Indices refer to the deduplicated vertex array returned by
+    `build_model_vertices_and_edges`.
+    """
+
     edge_id: int
     start_idx: int
     end_idx: int
@@ -65,6 +200,39 @@ class Edge:
 
 @dataclass
 class Arc:
+    """
+    Screen-space scratch arc emitted by the arc generation stage.
+
+    Parameters
+    ----------
+    edge_id : int
+        Source mesh edge identifier.
+    zero_coord : tuple[float, float, float]
+        Projected sample position in screen coordinates and projected depth.
+    rect_x, rect_y : float
+        Upper-left corner of the Tk/SVG arc bounding box in pixels.
+    rect_w, rect_h : float
+        Arc bounding box size in pixels.
+    start_angle : float
+        Start angle in degrees using the Tk/SVG convention adopted here.
+    sweep_angle : float
+        Signed angular extent in degrees.
+
+    Returns
+    -------
+    None
+        Dataclass container.
+
+    Notes
+    -----
+    Arc geometry is stored in the same convention used by the preview canvas so
+    SVG export can reuse the same projection and arc generation decisions.
+
+    Assumptions
+    -----------
+    Bounding-box values are already expressed in screen space.
+    """
+
     edge_id: int
     zero_coord: tuple[float, float, float]
     rect_x: float
@@ -77,12 +245,61 @@ class Arc:
 
 @dataclass
 class ZBuffer:
+    """
+    Coarse screen-space depth buffer used by conservative visibility culling.
+
+    Parameters
+    ----------
+    depth : np.ndarray
+        Two-dimensional depth grid, in positive screen-space depth units.
+        `+inf` denotes an uncovered cell.
+    screen_width : int
+        Width of the source viewport in pixels.
+    screen_height : int
+        Height of the source viewport in pixels.
+
+    Returns
+    -------
+    None
+        Dataclass container.
+
+    Notes
+    -----
+    The depth grid resolution can differ from the viewport resolution; mapping
+    is handled explicitly by `screen_to_zbuffer_coords`.
+
+    Assumptions
+    -----------
+    Depth values represent the closest triangle sample written into each cell.
+    """
+
     depth: np.ndarray
     screen_width: int
     screen_height: int
 
 
 def ensure_dependencies() -> None:
+    """
+    Validate optional runtime dependencies before executing the pipeline.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    This explicit check keeps the failure mode readable; the trade-off is a
+    small amount of startup overhead before mesh processing.
+
+    Assumptions
+    -----------
+    Missing packages should stop execution immediately.
+    """
+
     missing: list[str] = []
     if np is None:
         missing.append("numpy")
@@ -96,6 +313,29 @@ def ensure_dependencies() -> None:
 
 
 def normalize(v: np.ndarray) -> np.ndarray:
+    """
+    Normalize one vector or a batch of vectors.
+
+    Parameters
+    ----------
+    v : np.ndarray
+        Vector array of shape `(3,)` or `(N, 3)`, dimensionless or expressed in
+        any linear unit.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized vector array with the same shape as `v`.
+
+    Notes
+    -----
+    A small epsilon is used to avoid division by zero in batched mode.
+
+    Assumptions
+    -----------
+    Single-vector input must have non-zero norm.
+    """
+
     arr = np.asarray(v, dtype=np.float64)
     if arr.ndim == 1:
         n = float(np.linalg.norm(arr))
@@ -108,6 +348,32 @@ def normalize(v: np.ndarray) -> np.ndarray:
 
 
 def load_mesh(stl_path: Path) -> trimesh.Trimesh:
+    """
+    Load and sanitize a triangular mesh from disk.
+
+    Parameters
+    ----------
+    stl_path : Path
+        Path to the mesh file. The current workflow expects STL.
+
+    Returns
+    -------
+    trimesh.Trimesh
+        Cleaned mesh ready for edge extraction.
+
+    Notes
+    -----
+    The cleanup stage removes degenerate faces, duplicate faces, and
+    unreferenced vertices. The design decision improves stable edge sampling,
+    while the trade-off is that malformed source topology is normalized instead
+    of preserved verbatim.
+
+    Assumptions
+    -----------
+    The file contains a triangular mesh or a scene that can be concatenated
+    into one.
+    """
+
     if not stl_path.exists():
         raise FileNotFoundError(f"STL file not found: {stl_path}")
 
@@ -151,6 +417,37 @@ def build_model_vertices_and_edges(
     auto_center: bool,
     decimals: int,
 ) -> tuple[np.ndarray, list[Edge], np.ndarray]:
+    """
+    Build the deduplicated mesh arrays used by edge sampling and projection.
+
+    Parameters
+    ----------
+    mesh : trimesh.Trimesh
+        Input triangular mesh in model units.
+    auto_center : bool
+        If True, translates the mesh so the maximum `z` becomes `0`.
+    decimals : int
+        Decimal precision used to round vertices before topology extraction.
+
+    Returns
+    -------
+    tuple[np.ndarray, list[Edge], np.ndarray]
+        Deduplicated vertex array `(N, 3)` in model units, filtered edge list,
+        and remapped face index array `(M, 3)`.
+
+    Notes
+    -----
+    Vertex rounding is a deliberate design decision because it stabilizes mesh
+    deduplication and edge sampling across noisy STL exports; the trade-off is
+    that sub-tolerance details may collapse. Coplanar shared edges are dropped
+    to approximate merged faces, which reduces scratch noise but hides internal
+    triangulation.
+
+    Assumptions
+    -----------
+    `mesh.face_normals` is available and aligned with `mesh.faces`.
+    """
+
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     faces = np.asarray(mesh.faces, dtype=np.int64)
 
@@ -253,6 +550,30 @@ def build_model_vertices_and_edges(
 
 
 def build_model_to_view_matrix(camera: CameraConfig) -> np.ndarray:
+    """
+    Construct the rigid model-to-view transform.
+
+    Parameters
+    ----------
+    camera : CameraConfig
+        Camera configuration in model units and pixels.
+
+    Returns
+    -------
+    np.ndarray
+        Homogeneous transform matrix of shape `(4, 4)`.
+
+    Notes
+    -----
+    The returned basis uses `u` right, `v` up, and `n` pointing from the target
+    back toward the camera. This convention keeps `z_view` negative in front of
+    the camera, which simplifies the later visibility cull.
+
+    Assumptions
+    -----------
+    The camera basis is well-defined and non-degenerate.
+    """
+
     po = np.asarray(camera.po, dtype=np.float64)
     pr = np.asarray(camera.pr, dtype=np.float64)
     look_up = normalize(np.asarray(camera.look_up, dtype=np.float64))
@@ -276,6 +597,31 @@ def build_model_to_view_matrix(camera: CameraConfig) -> np.ndarray:
 
 
 def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
+    """
+    Construct the full model-to-screen projection matrix.
+
+    Parameters
+    ----------
+    camera : CameraConfig
+        Camera configuration in model units and pixels.
+
+    Returns
+    -------
+    np.ndarray
+        Homogeneous transform matrix of shape `(4, 4)` mapping model
+        coordinates to screen coordinates.
+
+    Notes
+    -----
+    `zf` controls the projective denominator. Large `zf` values approximate an
+    orthographic projection, which is a design decision used by the desktop app
+    to reduce perspective distortion; the trade-off is weaker depth cues.
+
+    Assumptions
+    -----------
+    `camera.canvas_width` and `camera.canvas_height` are positive.
+    """
+
     model_to_view = build_model_to_view_matrix(camera)
 
     perspective = np.eye(4, dtype=np.float64)
@@ -298,6 +644,33 @@ def build_model_to_window_matrix(camera: CameraConfig) -> np.ndarray:
 
 
 def model_to_window(points_xyz: np.ndarray, model_to_window_mtx: np.ndarray) -> np.ndarray:
+    """
+    Project model coordinates into screen coordinates.
+
+    Parameters
+    ----------
+    points_xyz : np.ndarray
+        Point array of shape `(N, 3)` in model units.
+    model_to_window_mtx : np.ndarray
+        Homogeneous projection matrix of shape `(4, 4)`.
+
+    Returns
+    -------
+    np.ndarray
+        Projected array of shape `(N, 3)` where `x` and `y` are screen pixels
+        and `z` is the projected depth-like coordinate after homogeneous divide.
+
+    Notes
+    -----
+    Division by a small homogeneous `w` is clamped for floating-point
+    robustness. The trade-off is finite output at the cost of very near-plane
+    precision.
+
+    Assumptions
+    -----------
+    `points_xyz` is finite and row-major.
+    """
+
     points = np.asarray(points_xyz, dtype=np.float64)
     ones = np.ones((points.shape[0], 1), dtype=np.float64)
     homo = np.hstack((points, ones))
@@ -310,6 +683,31 @@ def model_to_window(points_xyz: np.ndarray, model_to_window_mtx: np.ndarray) -> 
 
 
 def model_to_view(points_xyz: np.ndarray, model_to_view_mtx: np.ndarray) -> np.ndarray:
+    """
+    Transform model coordinates into camera view coordinates.
+
+    Parameters
+    ----------
+    points_xyz : np.ndarray
+        Point array of shape `(N, 3)` in model units.
+    model_to_view_mtx : np.ndarray
+        Homogeneous rigid transform matrix of shape `(4, 4)`.
+
+    Returns
+    -------
+    np.ndarray
+        View-space point array of shape `(N, 3)` in model units.
+
+    Notes
+    -----
+    No perspective divide is applied here; this stage is used by the visibility
+    cull and depth computations.
+
+    Assumptions
+    -----------
+    `points_xyz` is finite and row-major.
+    """
+
     points = np.asarray(points_xyz, dtype=np.float64)
     ones = np.ones((points.shape[0], 1), dtype=np.float64)
     homo = np.hstack((points, ones))
@@ -318,6 +716,31 @@ def model_to_view(points_xyz: np.ndarray, model_to_view_mtx: np.ndarray) -> np.n
 
 
 def compute_face_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """
+    Compute unit normals for a triangular mesh.
+
+    Parameters
+    ----------
+    vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+    faces : np.ndarray
+        Triangle index array of shape `(M, 3)`.
+
+    Returns
+    -------
+    np.ndarray
+        Unit face normals of shape `(M, 3)`.
+
+    Notes
+    -----
+    Degenerate triangles return zero normals rather than raising, because the
+    visibility cull prefers to skip invalid faces instead of aborting.
+
+    Assumptions
+    -----------
+    `faces` indexes `vertices` correctly.
+    """
+
     verts = np.asarray(vertices, dtype=np.float64)
     tri_idx = np.asarray(faces, dtype=np.int64)
     if tri_idx.size == 0:
@@ -338,6 +761,33 @@ def backface_mask(
     view_dir: np.ndarray,
     epsilon: float = 1.0e-9,
 ) -> np.ndarray:
+    """
+    Compute a front-facing mask for a set of face normals.
+
+    Parameters
+    ----------
+    face_normals : np.ndarray
+        Face normals of shape `(M, 3)`, dimensionless.
+    view_dir : np.ndarray
+        Viewing direction pointing from camera origin to target, dimensionless.
+    epsilon : float, optional
+        Signed dot-product tolerance used to reject nearly grazing faces.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask of shape `(M,)`, True for faces considered front-facing.
+
+    Notes
+    -----
+    A tolerance is used because floating-point noise near silhouette triangles
+    can flip the sign of the dot product.
+
+    Assumptions
+    -----------
+    `view_dir` is non-zero.
+    """
+
     normals = np.asarray(face_normals, dtype=np.float64)
     if normals.size == 0:
         return np.zeros((0,), dtype=bool)
@@ -353,6 +803,38 @@ def project_to_screen(
     model_to_window_mtx: np.ndarray | None = None,
     model_to_view_mtx: np.ndarray | None = None,
 ) -> np.ndarray:
+    """
+    Project model-space points into screen coordinates plus positive depth.
+
+    Parameters
+    ----------
+    points_xyz : np.ndarray
+        Point array of shape `(N, 3)` in model units.
+    camera : CameraConfig
+        Camera configuration used for projection.
+    model_to_window_mtx : np.ndarray | None, optional
+        Precomputed projection matrix. If omitted, it is built internally.
+    model_to_view_mtx : np.ndarray | None, optional
+        Precomputed rigid view matrix. If omitted, it is built internally.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape `(N, 3)` with `x`, `y` in screen pixels and `depth` as
+        positive `-z_view` in model units.
+
+    Notes
+    -----
+    Depth uses view-space distance rather than post-projection `z` because the
+    visibility cull is conceptually orthographic; the trade-off is simpler and
+    more stable comparisons, while perspective-specific depth precision is not
+    modeled here.
+
+    Assumptions
+    -----------
+    The provided matrices, if any, match the supplied camera.
+    """
+
     points = np.asarray(points_xyz, dtype=np.float64)
     if points.shape[0] == 0:
         return np.zeros((0, 3), dtype=np.float64)
@@ -376,6 +858,36 @@ def screen_to_zbuffer_coords(
     *,
     clamp_to_screen: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Map screen pixel coordinates into the coarse Z-buffer grid.
+
+    Parameters
+    ----------
+    screen_xy : np.ndarray
+        Screen-space coordinates of shape `(N, 2)` in pixels.
+    zbuffer : ZBuffer
+        Coarse Z-buffer descriptor.
+    clamp_to_screen : bool, optional
+        If True, clamps coordinates to the viewport before resampling into the
+        Z-buffer grid.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Fractional Z-buffer coordinates `(fx, fy)` in grid cells.
+
+    Notes
+    -----
+    The explicit mapping is a design decision because triangles and edge
+    sampling must share identical projection semantics; the trade-off is a
+    slightly more verbose implementation in exchange for reproducibility.
+
+    Assumptions
+    -----------
+    `zbuffer.screen_width` and `zbuffer.screen_height` describe the original
+    viewport used to create the depth grid.
+    """
+
     xy = np.asarray(screen_xy, dtype=np.float64)
     if xy.shape[0] == 0:
         empty = np.zeros((0,), dtype=np.float64)
@@ -404,6 +916,28 @@ def screen_to_zbuffer_coords(
 
 
 def assert_zbuffer_corner_mapping(zbuffer: ZBuffer) -> None:
+    """
+    Verify that viewport corners map exactly to Z-buffer corners.
+
+    Parameters
+    ----------
+    zbuffer : ZBuffer
+        Coarse Z-buffer descriptor.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    This debug assertion guards against off-by-one projection errors, with
+    particular attention to border cells where visibility holes are common.
+
+    Assumptions
+    -----------
+    The Z-buffer shape is already allocated.
+    """
+
     height, width = zbuffer.depth.shape
     corners = np.asarray(
         [
@@ -442,6 +976,46 @@ def build_zbuffer_conservative(
     resolution: int = 1024,
     coverage_dilation_size: int = 3,
 ) -> ZBuffer:
+    """
+    Rasterize mesh faces into a conservative coarse Z-buffer.
+
+    Parameters
+    ----------
+    screen_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in screen coordinates and positive depth.
+    faces : np.ndarray
+        Triangle index array of shape `(M, 3)`.
+    screen_width : int
+        Width of the source viewport in pixels.
+    screen_height : int
+        Height of the source viewport in pixels.
+    face_mask : np.ndarray | None, optional
+        Boolean mask used to include only selected faces.
+    resolution : int, optional
+        Target longer-side resolution for the coarse Z-buffer, in grid cells.
+    coverage_dilation_size : int, optional
+        Square dilation size applied to covered cells after inside-triangle
+        rasterization.
+
+    Returns
+    -------
+    ZBuffer
+        Coarse depth grid with `+inf` for uncovered cells.
+
+    Notes
+    -----
+    Only barycentrically valid pixels are written, then dilated. This is a
+    conservative design decision: it expands coverage to reduce holes during
+    edge sampling, while the trade-off is a higher chance of false-positive
+    occlusion near silhouettes. Depth starts at `+inf`, so coverage is defined
+    strictly by `depth < +inf`.
+
+    Assumptions
+    -----------
+    `screen_vertices` and `faces` are already expressed in the same projection
+    convention returned by `project_to_screen`.
+    """
+
     screen = np.asarray(screen_vertices, dtype=np.float64)
     tri_idx = np.asarray(faces, dtype=np.int64)
     screen_w = max(1, int(screen_width))
@@ -553,6 +1127,30 @@ def write_png_image(
     png_path: Path,
     image: np.ndarray,
 ) -> None:
+    """
+    Write a grayscale or RGB PNG without external imaging dependencies.
+
+    Parameters
+    ----------
+    png_path : Path
+        Destination file path.
+    image : np.ndarray
+        Image array of shape `(H, W)` or `(H, W, 3)` with 8-bit values.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    A tiny custom writer keeps the diagnostic path self-contained; the trade-off
+    is limited format support compared with using Pillow.
+
+    Assumptions
+    -----------
+    `image` is already quantized to `uint8` semantics.
+    """
+
     pixels = np.asarray(image, dtype=np.uint8)
     if pixels.ndim not in (2, 3):
         raise ValueError("PNG image must be HxW or HxWx3.")
@@ -601,6 +1199,30 @@ def write_zbuffer_coverage_mask_png(
     png_path: Path,
     zbuffer: ZBuffer,
 ) -> None:
+    """
+    Export a binary visualization of Z-buffer coverage.
+
+    Parameters
+    ----------
+    png_path : Path
+        Destination file path.
+    zbuffer : ZBuffer
+        Coarse depth buffer to visualize.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Covered cells (`depth < +inf`) are written in white, uncovered cells in
+    black, matching the visibility-cull convention.
+
+    Assumptions
+    -----------
+    `zbuffer.depth` is a finite 2-D array or empty.
+    """
+
     mask = np.where(np.isfinite(zbuffer.depth), 255, 0).astype(np.uint8)
     write_png_image(png_path, mask)
 
@@ -611,6 +1233,34 @@ def write_sample_visibility_overlay_png(
     sample_pixels: np.ndarray,
     visible_mask: np.ndarray,
 ) -> None:
+    """
+    Export a diagnostic overlay of edge sampling decisions on the Z-buffer grid.
+
+    Parameters
+    ----------
+    png_path : Path
+        Destination file path.
+    zbuffer : ZBuffer
+        Coarse depth buffer used as the background mask.
+    sample_pixels : np.ndarray
+        Edge-sampling positions of shape `(N, 2)` in Z-buffer grid indices.
+    visible_mask : np.ndarray
+        Boolean visibility decisions of shape `(N,)`.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Kept samples are green and culled samples are red. This is intended for
+    debugging projection and visibility mismatches, not for publication output.
+
+    Assumptions
+    -----------
+    `sample_pixels` and `visible_mask` refer to the same edge-sampling order.
+    """
+
     base = np.where(np.isfinite(zbuffer.depth), 255, 0).astype(np.uint8)
     image = np.repeat(base[:, :, None], 3, axis=2)
 
@@ -645,6 +1295,40 @@ def visible_mask_for_edge_samples(
     window_size: int = 5,
     return_empty_mask: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """
+    Evaluate conservative visibility for projected edge sampling points.
+
+    Parameters
+    ----------
+    screen_samples : np.ndarray
+        Sample array of shape `(N, 3)` in screen coordinates and positive depth.
+    zbuffer : ZBuffer
+        Coarse depth grid built from the same projection.
+    depth_epsilon : float
+        Additive depth tolerance in model units.
+    window_size : int, optional
+        Square neighborhood size in Z-buffer cells.
+    return_empty_mask : bool, optional
+        If True, also returns a mask indicating samples that touched empty or
+        out-of-bounds neighborhood cells.
+
+    Returns
+    -------
+    np.ndarray | tuple[np.ndarray, np.ndarray]
+        Visibility mask, optionally paired with the empty-neighborhood mask.
+
+    Notes
+    -----
+    The rule is intentionally conservative: if any neighborhood cell is empty,
+    the sample is kept. Otherwise the sample is kept when its depth is no
+    greater than `min_depth + depth_epsilon`. The design decision reduces holes
+    on visible faces, while the trade-off is extra false positives.
+
+    Assumptions
+    -----------
+    `screen_samples` was produced by `project_to_screen`.
+    """
+
     screen = np.asarray(screen_samples, dtype=np.float64)
     if screen.shape[0] == 0:
         empty = np.zeros((0,), dtype=bool)
@@ -720,6 +1404,49 @@ def build_sample_visibility_lookup(
     sample_window_size: int = 5,
     debug_output_prefix: Path | None = None,
 ) -> tuple[dict[int, np.ndarray], dict[str, float | str]]:
+    """
+    Build per-edge visibility masks for the current camera view.
+
+    Parameters
+    ----------
+    model_vertices : np.ndarray
+        Deduplicated mesh vertices of shape `(N, 3)` in model units.
+    edges : list[Edge]
+        Mesh edges used for edge sampling.
+    faces : np.ndarray
+        Triangle index array of shape `(M, 3)`.
+    camera : CameraConfig
+        Camera used for projection and visibility culling.
+    view_points_per_unit_length : float
+        Edge sampling density in samples per model unit.
+    zbuffer_resolution : int, optional
+        Coarse Z-buffer resolution along the longer viewport side.
+    coverage_dilation_size : int, optional
+        Dilation window used during conservative rasterization.
+    sample_window_size : int, optional
+        Neighborhood window used during the sample visibility test.
+    debug_output_prefix : Path | None, optional
+        If provided, writes diagnostic PNGs using the prefix stem.
+
+    Returns
+    -------
+    tuple[dict[int, np.ndarray], dict[str, float | str]]
+        Mapping from `edge_id` to a boolean visibility mask in edge-sampling
+        order, plus aggregate visibility statistics.
+
+    Notes
+    -----
+    The orthographic depth epsilon is scaled from the view-space mesh diagonal.
+    This is a deliberate design decision because a global epsilon is easier to
+    reason about across the pipeline; the trade-off is that extremely small and
+    extremely large meshes may still require retuning.
+
+    Assumptions
+    -----------
+    The same camera and edge sampling density will later be reused by arc
+    generation.
+    """
+
     verts = np.asarray(model_vertices, dtype=np.float64)
     if verts.shape[0] == 0 or len(edges) == 0 or len(faces) == 0:
         return {}, {
@@ -824,6 +1551,30 @@ def build_sample_visibility_lookup(
 
 
 def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float, float, float]:
+    """
+    Convert one projected sample into the bounding box of its scratch arc.
+
+    Parameters
+    ----------
+    point_zero : np.ndarray
+        Projected sample `(x, y, z)` in screen coordinates and projected depth.
+    n_view : float
+        Projected depth of the camera target point.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        Arc bounding box `(rect_x, rect_y, rect_w, rect_h)` in pixels.
+
+    Notes
+    -----
+    The arc diameter is proportional to the sample depth offset from `n_view`.
+
+    Assumptions
+    -----------
+    `point_zero` follows the same convention returned by `model_to_window`.
+    """
+
     distance_from_canvas = float(point_zero[2] - n_view)
     center_x = float(point_zero[0])
     center_y = float(point_zero[1] - distance_from_canvas / 2.0)
@@ -842,6 +1593,34 @@ def get_edge_points(
     zero_end: np.ndarray,
     view_points_per_unit_length: float,
 ) -> np.ndarray:
+    """
+    Interpolate projected samples along one edge in screen space.
+
+    Parameters
+    ----------
+    model_start, model_end : np.ndarray
+        Edge endpoints in model units.
+    zero_start, zero_end : np.ndarray
+        Corresponding projected endpoints in screen coordinates.
+    view_points_per_unit_length : float
+        Edge sampling density in samples per model unit.
+
+    Returns
+    -------
+    np.ndarray
+        Interpolated sample array of shape `(N, 3)` in screen coordinates.
+
+    Notes
+    -----
+    This helper is retained for compatibility. The preferred path is model-space
+    edge sampling followed by projection because that keeps projection and edge
+    sampling coupled; the trade-off here is speed versus geometric fidelity.
+
+    Assumptions
+    -----------
+    The projected endpoints correspond to the model endpoints.
+    """
+
     length_model = float(np.linalg.norm(model_end - model_start))
     num_points = max(2, int(view_points_per_unit_length * length_model))
     fractions = np.linspace(0.0, 1.0, num_points)
@@ -853,6 +1632,34 @@ def sample_edge_model_points(
     edge: Edge,
     view_points_per_unit_length: float,
 ) -> np.ndarray:
+    """
+    Sample one mesh edge uniformly in model space.
+
+    Parameters
+    ----------
+    model_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+    edge : Edge
+        Mesh edge to sample.
+    view_points_per_unit_length : float
+        Edge sampling density in samples per model unit.
+
+    Returns
+    -------
+    np.ndarray
+        Sample array of shape `(K, 3)` in model units.
+
+    Notes
+    -----
+    Uniform model-space edge sampling is used so visibility and arc generation
+    see the same samples. The trade-off is that long projected edges under
+    foreshortening may still be under-sampled compared with adaptive sampling.
+
+    Assumptions
+    -----------
+    `edge.start_idx` and `edge.end_idx` are valid vertex indices.
+    """
+
     model_start = np.asarray(model_vertices[edge.start_idx], dtype=np.float64)
     model_end = np.asarray(model_vertices[edge.end_idx], dtype=np.float64)
     length_model = float(np.linalg.norm(model_end - model_start))
@@ -875,6 +1682,54 @@ def generate_arcs(
     model_to_view_mtx: np.ndarray | None = None,
     sample_visibility_by_edge: dict[int, np.ndarray] | None = None,
 ) -> list[Arc]:
+    """
+    Convert sampled mesh edges into projected scratch arcs.
+
+    Parameters
+    ----------
+    model_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+    zero_vertices : np.ndarray
+        Preprojected vertex array of shape `(N, 3)` in screen coordinates.
+    edges : list[Edge]
+        Mesh edges used for edge sampling.
+    view_points_per_unit_length : float
+        Edge sampling density in samples per model unit.
+    n_view : float
+        Projected depth of the camera target point.
+    dedupe_decimals : int
+        Decimal precision used to deduplicate projected samples.
+    min_arc_radius : float
+        Minimum projected arc radius in pixels.
+    arc_mode : str, optional
+        Arc generation mode: `"semi"` or `"elliptic"`.
+    ellipse_ratio : float, optional
+        Height/width ratio for elliptic arc generation.
+    model_to_window_mtx : np.ndarray | None, optional
+        Precomputed projection matrix used to project edge-sampling points.
+    model_to_view_mtx : np.ndarray | None, optional
+        Reserved for projection consistency with callers.
+    sample_visibility_by_edge : dict[int, np.ndarray] | None, optional
+        Optional visibility masks keyed by `edge_id`.
+
+    Returns
+    -------
+    list[Arc]
+        Sorted scratch arcs ready for SVG or G-code export.
+
+    Notes
+    -----
+    Arc generation operates on edge sampling points, not on faces. Deduplication
+    is intentionally applied both to projected sample positions and to arc
+    geometry; the trade-off is deterministic SVG output at the cost of dropping
+    coincident arcs that would otherwise overdraw the same path.
+
+    Assumptions
+    -----------
+    If `sample_visibility_by_edge` is provided, its masks were computed with the
+    same edge sampling density.
+    """
+
     seen_coords: set[str] = set()
     seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
     arcs: list[Arc] = []
@@ -973,6 +1828,33 @@ def build_simulation_edge_info(
     edges: list[Edge],
     view_points_per_unit_length: float,
 ) -> list[tuple[int, int, int, float, float, float]]:
+    """
+    Prepare compact edge-sampling metadata for the HTML simulator.
+
+    Parameters
+    ----------
+    model_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+    edges : list[Edge]
+        Mesh edges used for edge sampling.
+    view_points_per_unit_length : float
+        Edge sampling density in samples per model unit.
+
+    Returns
+    -------
+    list[tuple[int, int, int, float, float, float]]
+        Tuples containing edge endpoints, sample count, and averaged edge normal.
+
+    Notes
+    -----
+    The simulator receives metadata rather than full edge-sampling points to
+    keep the HTML payload smaller; the trade-off is re-sampling in JavaScript.
+
+    Assumptions
+    -----------
+    The simulator will rebuild projection from the same mesh and camera data.
+    """
+
     sim_edges: list[tuple[int, int, int, float, float, float]] = []
     for edge in edges:
         start = model_vertices[edge.start_idx]
@@ -993,6 +1875,28 @@ def build_simulation_edge_info(
 
 
 def compute_sim_bounds_from_arcs(arcs: list[Arc]) -> tuple[float, float, float, float]:
+    """
+    Compute a conservative screen-space bounding box for a set of arcs.
+
+    Parameters
+    ----------
+    arcs : list[Arc]
+        Arc list in screen coordinates.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        Bounds `(min_x, min_y, max_x, max_y)` in pixels.
+
+    Notes
+    -----
+    Empty input falls back to a unit box so downstream HTML layout stays valid.
+
+    Assumptions
+    -----------
+    Arc bounding boxes are already expressed in screen coordinates.
+    """
+
     if not arcs:
         return 0.0, 0.0, 1.0, 1.0
 
@@ -1012,6 +1916,41 @@ def write_simulation_html(
     arcs: list[Arc],
     min_arc_radius: float,
 ) -> None:
+    """
+    Write a self-contained HTML viewer for projection and arc generation checks.
+
+    Parameters
+    ----------
+    html_path : Path
+        Destination file path.
+    model_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+    model_faces : np.ndarray
+        Triangle index array of shape `(M, 3)`.
+    sim_edges : list[tuple[int, int, int, float, float, float]]
+        Edge-sampling metadata returned by `build_simulation_edge_info`.
+    camera : CameraConfig
+        Camera configuration used as the baseline projection.
+    arcs : list[Arc]
+        Screen-space arcs used for pattern preview.
+    min_arc_radius : float
+        Arc generation threshold in pixels.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The viewer duplicates parts of the projection logic in JavaScript because
+    it is intended as an inspection aid. The trade-off is some code duplication
+    in exchange for an interactive artifact that can support thesis figures.
+
+    Assumptions
+    -----------
+    The generated HTML is used for diagnostics, not for production export.
+    """
+
     html_path.parent.mkdir(parents=True, exist_ok=True)
 
     min_x, min_y, max_x, max_y = compute_sim_bounds_from_arcs(arcs)
@@ -1431,6 +2370,30 @@ def write_simulation_html(
 
 
 def arc_endpoints_svg(arc: Arc) -> tuple[float, float, float, float, float, float]:
+    """
+    Convert one arc record into SVG endpoint and radius parameters.
+
+    Parameters
+    ----------
+    arc : Arc
+        Screen-space arc description.
+
+    Returns
+    -------
+    tuple[float, float, float, float, float, float]
+        Start point `(x1, y1)`, end point `(x2, y2)`, and ellipse radii
+        `(rx, ry)` in pixels.
+
+    Notes
+    -----
+    The same angular convention as the Tk preview is preserved so SVG export
+    matches the previewed arc generation exactly.
+
+    Assumptions
+    -----------
+    `arc.rect_w` and `arc.rect_h` are non-negative.
+    """
+
     rx = arc.rect_w / 2.0
     ry = arc.rect_h / 2.0
     cx = arc.rect_x + arc.rect_w / 2.0
@@ -1449,6 +2412,33 @@ def arc_endpoints_svg(arc: Arc) -> tuple[float, float, float, float, float, floa
 
 
 def write_svg(svg_path: Path, arcs: list[Arc], stroke_width: float) -> None:
+    """
+    Export the arc set as one SVG path collection.
+
+    Parameters
+    ----------
+    svg_path : Path
+        Destination file path.
+    arcs : list[Arc]
+        Screen-space arc list.
+    stroke_width : float
+        SVG stroke width in screen units (pixels in the viewBox).
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Arcs are emitted as one `<path>` with repeated move and arc commands. This
+    is a design decision because it keeps the SVG compact; the trade-off is that
+    individual arcs are not separately addressable in downstream editors.
+
+    Assumptions
+    -----------
+    `arcs` is already ordered in the desired export sequence.
+    """
+
     svg_path.parent.mkdir(parents=True, exist_ok=True)
 
     min_x = math.inf
@@ -1513,6 +2503,38 @@ def write_debug_json(
     edges_count: int,
     arcs: list[Arc],
 ) -> None:
+    """
+    Write a structured JSON snapshot of the current pipeline state.
+
+    Parameters
+    ----------
+    json_path : Path
+        Destination file path.
+    camera : CameraConfig
+        Camera configuration used for projection.
+    pipeline : PipelineConfig
+        Arc generation parameters.
+    n_view : float
+        Projected depth of the camera target point.
+    edges_count : int
+        Number of mesh edges after filtering.
+    arcs : list[Arc]
+        Generated screen-space arcs.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The JSON is intended for debugging and thesis inspection, not for strict
+    interchange. Field names preserve some legacy naming for compatibility.
+
+    Assumptions
+    -----------
+    The caller wants a human-readable debug artifact.
+    """
+
     json_path.parent.mkdir(parents=True, exist_ok=True)
 
     payload = {
@@ -1542,6 +2564,28 @@ def write_debug_json(
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Define and parse the command-line interface for the pipeline.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed command-line arguments.
+
+    Notes
+    -----
+    The CLI exposes mesh loading, edge sampling, projection, SVG export, and
+    optional diagnostics in one entry point.
+
+    Assumptions
+    -----------
+    Validation is deferred to `validate_args`.
+    """
+
     parser = argparse.ArgumentParser(
         description="Generate HoloZens-style arc SVG from STL edges"
     )
@@ -1609,6 +2653,28 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    """
+    Validate the numeric ranges of CLI parameters.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Validation is explicit rather than relying on downstream failures because it
+    produces clearer errors for batch runs and thesis experiments.
+
+    Assumptions
+    -----------
+    `args` was produced by `parse_args`.
+    """
+
     if args.line_resolution <= 0:
         raise ValueError("--line-resolution must be > 0")
     if args.stroke_width <= 0:
@@ -1630,6 +2696,30 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
+    """
+    Execute the full mesh-to-SVG pipeline for one command-line invocation.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Validated command-line arguments.
+
+    Returns
+    -------
+    int
+        Process exit code (`0` on success).
+
+    Notes
+    -----
+    The function computes all arcs first, then recomputes visible arcs with the
+    visibility cull. Keeping both counts is a design decision because it makes
+    debugging easier; the trade-off is one extra arc-generation pass.
+
+    Assumptions
+    -----------
+    Runtime dependencies are installed and the input mesh is readable.
+    """
+
     validate_args(args)
     ensure_dependencies()
 
@@ -1743,6 +2833,28 @@ def run(args: argparse.Namespace) -> int:
 
 
 def unit_cube_visibility_cull_smoke_test() -> dict[str, int]:
+    """
+    Run a deterministic visibility-cull smoke test on a unit cube.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    dict[str, int]
+        Summary counters for edge sampling and visible arc generation.
+
+    Notes
+    -----
+    The test is intended as a regression check for the visibility cull and
+    diagnostic PNG generation, not as a formal unit-test suite.
+
+    Assumptions
+    -----------
+    `numpy` is available and the current working tree is writable for debug PNGs.
+    """
+
     if np is None:
         raise RuntimeError("numpy is required for the visibility smoke test.")
 
@@ -1888,6 +3000,28 @@ def unit_cube_visibility_cull_smoke_test() -> dict[str, int]:
 
 
 def main() -> int:
+    """
+    Command-line entry point for the scratch hologram pipeline.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    int
+        Process exit code.
+
+    Notes
+    -----
+    Exceptions are converted into a non-zero exit code after a readable stderr
+    message, which is preferable for batch fabrication workflows.
+
+    Assumptions
+    -----------
+    The script is executed in a standard Python process.
+    """
+
     args = parse_args()
     try:
         return run(args)
@@ -1898,3 +3032,25 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Thesis extraction notes
+# -----------------------
+# 1. Load and sanitize the mesh, then remove invalid topology before edge sampling.
+# 2. Round vertices and merge coplanar triangulation edges to stabilize the mesh graph.
+# 3. Build a camera basis, then apply projection from model space to screen space.
+# 4. Sample each mesh edge uniformly in model space using a user-defined sampling density.
+# 5. Rasterize projected mesh faces into a conservative coarse Z-buffer.
+# 6. Evaluate visibility per edge-sampling point with a neighborhood-based depth test.
+# 7. Convert visible projected samples into semicircular or elliptic arc geometry.
+# 8. Deduplicate coincident projected samples and repeated arc geometry for stable SVG output.
+# 9. Export the final arc set as SVG, optional debug JSON, and optional simulation HTML.
+# 10. Reuse the same arc geometry for downstream G-code generation in the desktop application.
+#
+# Useful figures/snippets
+# -----------------------
+# - `build_model_vertices_and_edges`: mesh cleanup and topology extraction.
+# - `build_model_to_view_matrix` + `build_model_to_window_matrix`: projection model.
+# - `build_zbuffer_conservative`: conservative screen-space rasterization.
+# - `visible_mask_for_edge_samples`: neighborhood-based visibility rule.
+# - `generate_arcs`: transition from edge sampling to arc generation.
