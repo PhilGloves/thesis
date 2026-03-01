@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.1)  1 MAR 2026 22:08
+This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  2 MAR 2026 00:14
  restricted system commands enabled.
 **tesi.tex
 (./tesi.tex
@@ -42,8 +42,8 @@ Inserting `luaotfload.rewrite_fontname' in `luaotfload.patch_font'.
 Inserting `tracingstacklevels' in `input_level_string'. ("C:/Program Files/MiKT
 eX/tex/latex/base/book.cls"
 Document Class: book 2025/01/22 v1.4n Standard LaTeX document class
-("C:/Program Files/MiKTeX/tex/latex/base/bk10.clo"
-File: bk10.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
+("C:/Program Files/MiKTeX/tex/latex/base/bk11.clo"
+File: bk11.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
 luaotfload | db : Font names database loaded from C:/Users/filip/AppData/Local/M
 iKTeX/luatex-cache/generic/names/luaotfload-names.luc.gz)
 \c@part=\count273
@@ -59,18 +59,28 @@ iKTeX/luatex-cache/generic/names/luaotfload-names.luc.gz)
 \belowcaptionskip=\skip50
 \bibindent=\dimen147
 )
-("C:/Program Files/MiKTeX/tex/latex/graphics/color.sty"
-Package: color 2025/01/14 v1.3e Standard LaTeX Color (DPC)
+("C:/Program Files/MiKTeX/tex/latex/xcolor/xcolor.sty"
+Package: xcolor 2024/09/29 v3.02 LaTeX color extensions (UK)
 
 ("C:/Program Files/MiKTeX/tex/latex/graphics-cfg/color.cfg"
 File: color.cfg 2016/01/02 v1.6 sample color configuration
 )
-Package color Info: Driver file: luatex.def on input line 149.
+Package xcolor Info: Driver file: luatex.def on input line 274.
 
 ("C:/Program Files/MiKTeX/tex/latex/graphics-def/luatex.def"
 File: luatex.def 2025/09/29 v1.2f Graphics/color driver for luatex
 )
-("C:/Program Files/MiKTeX/tex/latex/graphics/mathcolor.ltx"))
+("C:/Program Files/MiKTeX/tex/latex/graphics/mathcolor.ltx")
+Package xcolor Info: Model `cmy' substituted by `cmy0' on input line 1349.
+Package xcolor Info: Model `hsb' substituted by `rgb' on input line 1353.
+Package xcolor Info: Model `RGB' extended on input line 1365.
+Package xcolor Info: Model `HTML' substituted by `rgb' on input line 1367.
+Package xcolor Info: Model `Hsb' substituted by `hsb' on input line 1368.
+Package xcolor Info: Model `tHsb' substituted by `hsb' on input line 1369.
+Package xcolor Info: Model `HSB' substituted by `hsb' on input line 1370.
+Package xcolor Info: Model `Gray' substituted by `gray' on input line 1371.
+Package xcolor Info: Model `wave' substituted by `hsb' on input line 1372.
+)
 ("C:/Program Files/MiKTeX/tex/latex/graphics/graphicx.sty"
 Package: graphicx 2024/12/31 v1.2e Enhanced LaTeX Graphics (DPC,SPQR)
 
@@ -190,10 +200,6 @@ Package: amsfonts 2013/01/14 v3.01 Basic AMSFonts support
 \symAMSb=\mathgroup6
 LaTeX Font Info:    Redeclaring math symbol \hbar on input line 98.
 )
-("C:/Program Files/MiKTeX/tex/latex/jknappen/mathbbol.sty"
-Package: mathbbol 1995/01/01
-\symbbold=\mathgroup7
-)
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/amssymb.sty"
 Package: amssymb 2013/01/14 v3.01 AMS font symbols
 )
@@ -215,7 +221,7 @@ Package: amsthm 2020/05/29 v2.20.6
 )
 ("C:/Program Files/MiKTeX/tex/latex/stmaryrd/stmaryrd.sty"
 Package: stmaryrd 1994/03/03 St Mary's Road symbol package
-\symstmry=\mathgroup8
+\symstmry=\mathgroup7
 LaTeX Font Info:    Overwriting symbol font `stmry' in version `bold'
 (Font)                  U/stmry/m/n --> U/stmry/b/n on input line 89.
 )
@@ -290,27 +296,7 @@ File: pgfsyssoftpath.code.tex 2025-08-29 v3.1.11a (3.1.11a)
 ) ("C:/Program Files/MiKTeX/tex/generic/pgf/systemlayer/pgfsysprotocol.code.tex
 "
 File: pgfsysprotocol.code.tex 2025-08-29 v3.1.11a (3.1.11a)
-)) ("C:/Program Files/MiKTeX/tex/latex/xcolor/xcolor.sty"
-Package: xcolor 2024/09/29 v3.02 LaTeX color extensions (UK)
-
-("C:/Program Files/MiKTeX/tex/latex/graphics-cfg/color.cfg"
-File: color.cfg 2016/01/02 v1.6 sample color configuration
-)
-Package xcolor Info: Driver file: luatex.def on input line 274.
-LaTeX Info: Redefining \color on input line 762.
-
-("C:/Program Files/MiKTeX/tex/latex/graphics/mathcolor.ltx")
-Package xcolor Info: Model `cmy' substituted by `cmy0' on input line 1349.
-Package xcolor Info: Model `hsb' substituted by `rgb' on input line 1353.
-Package xcolor Info: Model `RGB' extended on input line 1365.
-Package xcolor Info: Model `HTML' substituted by `rgb' on input line 1367.
-Package xcolor Info: Model `Hsb' substituted by `hsb' on input line 1368.
-Package xcolor Info: Model `tHsb' substituted by `hsb' on input line 1369.
-Package xcolor Info: Model `HSB' substituted by `hsb' on input line 1370.
-Package xcolor Info: Model `Gray' substituted by `gray' on input line 1371.
-Package xcolor Info: Model `wave' substituted by `hsb' on input line 1372.
-)
-("C:/Program Files/MiKTeX/tex/generic/pgf/basiclayer/pgfcore.code.tex"
+)) ("C:/Program Files/MiKTeX/tex/generic/pgf/basiclayer/pgfcore.code.tex"
 Package: pgfcore 2025-08-29 v3.1.11a (3.1.11a)
 
 ("C:/Program Files/MiKTeX/tex/generic/pgf/math/pgfmath.code.tex"
@@ -790,10 +776,10 @@ LaTeX Info: Redefining \barwedge on input line 84.
 LaTeX Info: Redefining \doublebarwedge on input line 84.
 LaTeX Info: Redefining \centerdot on input line 84.
 LaTeX Info: Redefining \divideontimes on input line 84.
-\symMnSyA=\mathgroup9
-\symMnSyB=\mathgroup10
-\symMnSyC=\mathgroup11
-\symMnSyD=\mathgroup12
+\symMnSyA=\mathgroup8
+\symMnSyB=\mathgroup9
+\symMnSyC=\mathgroup10
+\symMnSyD=\mathgroup11
 LaTeX Font Info:    Redeclaring symbol font `largesymbols' on input line 119.
 LaTeX Font Info:    Overwriting symbol font `largesymbols' in version `normal'
 (Font)                  OMX/lmex/m/n --> OMX/MnSymbolE/m/n on input line 119.
@@ -853,7 +839,7 @@ Package: setspace 2022/12/04 v6.7b set line spacing
 
 ("C:/Program Files/MiKTeX/tex/latex/wasysym/wasysym.sty"
 Package: wasysym 2020/01/19 v2.4 Wasy-2 symbol support package
-\symwasy=\mathgroup13
+\symwasy=\mathgroup12
 LaTeX Font Info:    Overwriting symbol font `wasy' in version `bold'
 (Font)                  U/wasy/m/n --> U/wasy/b/n on input line 93.
 LaTeX Font Info:    Redeclaring math symbol \invneg on input line 242.
@@ -973,22 +959,22 @@ TextBlockOrigin set to 0pt x 0pt
 ) (./tesi.aux)
 \openout1 = tesi.aux
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 158.
-LaTeX Font Info:    ... okay on input line 158.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 160.
+LaTeX Font Info:    ... okay on input line 160.
  ("C:/Program Files/MiKTeX/tex/context/base/mkii/supp-pdf.mkii"
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count344
@@ -1060,13 +1046,13 @@ File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 * \evensidemargin=0.0pt
 * \topmargin=-21.68121pt
 * \headheight=12.0pt
-* \headsep=18.06749pt
-* \topskip=10.0pt
-* \footskip=25.29494pt
-* \marginparwidth=115.0pt
+* \headsep=19.8738pt
+* \topskip=11.0pt
+* \footskip=27.46295pt
+* \marginparwidth=106.0pt
 * \marginparsep=7.0pt
 * \columnsep=10.0pt
-* \skip\footins=9.0pt plus 4.0pt minus 2.0pt
+* \skip\footins=10.0pt plus 4.0pt minus 2.0pt
 * \hoffset=0.0pt
 * \voffset=0.0pt
 * \mag=1000
@@ -1078,78 +1064,80 @@ File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 
 \c@lstlisting=\count350
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 10.0pt on input line 163.
+(Font)              scaled to size 10.95pt on input line 165.
 <LogoUniToConvertito.png, id=4, 223.83624pt x 281.05pt>
 File: LogoUniToConvertito.png Graphic file (type png)
 <use LogoUniToConvertito.png>
-Package luatex.def Info: LogoUniToConvertito.png  used on input line 166.
+Package luatex.def Info: LogoUniToConvertito.png  used on input line 168.
 (luatex.def)             Requested size: 104.42155pt x 131.11574pt.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 18.0pt on input line 171.
+(Font)              scaled to size 18.0pt on input line 173.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 18.0pt on input line 172.
+(Font)              scaled to size 18.0pt on input line 174.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/it' will be
-(Font)              scaled to size 18.0pt on input line 176.
+(Font)              scaled to size 18.0pt on input line 178.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 20.0pt on input line 181.
+(Font)              scaled to size 20.0pt on input line 183.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 20.0pt on input line 182.
+(Font)              scaled to size 20.0pt on input line 184.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.4pt on input line 186.
+(Font)              scaled to size 14.4pt on input line 188.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.0pt on input line 191.
+(Font)              scaled to size 14.0pt on input line 193.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 14.0pt on input line 195.
+(Font)              scaled to size 14.0pt on input line 197.
+[1{C:/Users/filip/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
+
+
+<./LogoUniToConvertito.png>] [2
+
+
+]
 LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 2
-21.
-("C:/Program Files/MiKTeX/tex/latex/lm/ot1lmr.fd"
+47.
+ ("C:/Program Files/MiKTeX/tex/latex/lm/ot1lmr.fd"
 File: ot1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OML+lmm on input line 2
-21.
+47.
 
 ("C:/Program Files/MiKTeX/tex/latex/lm/omllmm.fd"
 File: omllmm.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-LaTeX Font Info:    Trying to load font information for U+rsfs on input line 22
-1.
+LaTeX Font Info:    Trying to load font information for U+rsfs on input line 24
+7.
 
 ("C:/Program Files/MiKTeX/tex/latex/jknappen/ursfs.fd"
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 )
-LaTeX Font Info:    Trying to load font information for U+msa on input line 221
+LaTeX Font Info:    Trying to load font information for U+msa on input line 247
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsa.fd"
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 221
+LaTeX Font Info:    Trying to load font information for U+msb on input line 247
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsb.fd"
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-LaTeX Font Info:    Trying to load font information for U+bbold on input line 2
-21.
-
-("C:/Program Files/MiKTeX/tex/latex/jknappen/ubbold.fd"
-File: ubbold.fd 1996/01/01 Blackboard Bold Font Definition File (jk)
-)
 LaTeX Font Info:    Trying to load font information for U+stmry on input line 2
-21.
+47.
 
 ("C:/Program Files/MiKTeX/tex/latex/stmaryrd/ustmry.fd")
-LaTeX Font Info:    Trying to load font information for U+wasy on input line 22
-1.
+luaotfload | db : Reload initiated (formats: otf,ttf,ttc); reason: Font "stmary8
+" not found.
+luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
+luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
+luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
+luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
+LaTeX Font Info:    Trying to load font information for U+wasy on input line 24
+7.
 
 ("C:/Program Files/MiKTeX/tex/latex/wasysym/uwasy.fd"
 File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
-) [1{C:/Users/filip/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
-
-<./LogoUniToConvertito.png>]
-[2
-
-] [1] [2
+) [1] [2
 
 ] [3
 
@@ -1157,21 +1145,27 @@ File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
 ] [4
 
 
-] (./tesi.toc [5])
+]
+(./tesi.toc [5] [6])
 \tf@toc=\write4
 
 \openout4 = tesi.toc
- [6]
-Chapter 1.
-[1
+ [7] [8
 
-
-
-] [2
 
 ]
+Chapter 1.
+
+Underfull \vbox (badness 5711) has occurred while \output is active []
+
+ [1
+
+]
+[2]
 Chapter 2.
-[3] [4
+[3
+
+] [4
 
 ]
 Chapter 3.
@@ -1208,10 +1202,10 @@ Chapter 10.
 ]
 Chapter 11.
 
-LaTeX Warning: Reference `ps:2' on page 21 undefined on input line 355.
+LaTeX Warning: Reference `ps:2' on page 21 undefined on input line 382.
 
 
-LaTeX Warning: Reference `sec:11' on page 21 undefined on input line 357.
+LaTeX Warning: Reference `sec:11' on page 21 undefined on input line 384.
 
 [21] [22
 
@@ -1232,24 +1226,23 @@ LaTeX Warning: There were undefined references.
 )
 
 Here is how much of LuaTeX's memory you used:
- 25404 strings out of 476076
+ 25305 strings out of 476076
  100000,953878 words of node,token memory allocated
- 554 words of node memory still in use:
-   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 14 attribute, 54 glue_spec
+ 559 words of node memory still in use:
+   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 14 attribute, 55 glue_spec
 , 8 attribute_list, 2 write nodes
-   avail lists: 2:987,3:307,4:128,5:396,6:76,7:4036,8:1,9:500,10:26,11:324
- 47171 multiletter control sequences out of 65536+600000
- 85 fonts using 16049751 bytes
- 98i,6n,113p,1466b,267s stack positions out of 10000i,1000n,20000p,200000b,200000s
+   avail lists: 2:968,3:301,4:130,5:384,6:73,7:9567,8:1,9:498,10:33,11:917
+ 47097 multiletter control sequences out of 65536+600000
+ 82 fonts using 15780711 bytes
+ 98i,6n,104p,1466b,267s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <c:/program files/miktex/fonts/opentype/public/lm/lmroman10-italic.otf><c:/progr
 am files/miktex/fonts/opentype/public/lm/lmroman10-bold.otf><c:/program files/mi
-ktex/fonts/opentype/public/lm/lmroman10-regular.otf><c:/program files/miktex/fon
-ts/opentype/public/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/opentype
-/public/lm/lmroman9-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Windows/Fonts/v
-erdanai.ttf><C:/Windows/Fonts/tahomabd.ttf>
-Output written on tesi.pdf (33 pages, 150080 bytes).
+ktex/fonts/opentype/public/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/
+opentype/public/lm/lmroman10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Window
+s/Fonts/verdanai.ttf><C:/Windows/Fonts/tahomabd.ttf>
+Output written on tesi.pdf (35 pages, 152295 bytes).
 
-PDF statistics: 167 PDF objects out of 1000 (max. 8388607)
+PDF statistics: 166 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 1048576)
  16 words of extra memory for PDF output out of 10000 (max. 100000000)
 

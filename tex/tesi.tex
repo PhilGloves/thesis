@@ -1,13 +1,14 @@
-\documentclass[a4paper,10 pt,titlepage,twoside]{book}
+\documentclass[a4paper,11pt,titlepage,twoside]{book}
 
-\usepackage[luatex]{color, graphicx}
+\usepackage{xcolor}
+\usepackage{graphicx}
 
 \usepackage{mathrsfs}
 \usepackage{array,epsfig}
 \usepackage{amsmath}
 \usepackage{eufrak}
 \usepackage{amsfonts}
-\usepackage{mathbbol}
+%\usepackage{mathbbol}
 \usepackage{amssymb}
 \usepackage{amsxtra}
 \usepackage{amsthm}
@@ -39,6 +40,7 @@
 \newcommand{\LC}{\mathcal{L}}
 \newcommand{\support}{\mathrm{support}}
 \newcommand{\Oset}{\varnothing}
+\newcommand{\1}{\mathbf{1}}
 \DeclareMathOperator{\id}{id}
 
 \numberwithin{equation}{chapter}
@@ -88,7 +90,7 @@
 \DeclareMathOperator{\ve}{vect}
 %\DeclareMathOperator{\diff}{diffmfd}
 \DeclareMathOperator{\g}{\mathfrak{g}}
-\DeclareMathOperator{\1}{\mathbb{1}}
+%\DeclareMathOperator{\1}{\mathbb{1}} REPLACED WITH \newcommand{\1}{\mathbf{1}}
 
 %\DeclareMathOperator{\del}{\partial\!}
 \newcommand{\del}{\partial}
@@ -141,7 +143,7 @@
 \newcommand{\rvline}{\hspace*{-\arraycolsep}\vline\hspace*{-\arraycolsep}}
 
 \usepackage{wasysym}
-\newcommand{\heart}{\gamma}
+%\newcommand{\heart}{\gamma}
 \renewcommand\epsilon{\varepsilon}
 \renewcommand\phi{\varphi}
 
@@ -156,7 +158,7 @@ ItalicFont={Verdana Italic},
 \usepackage[absolute]{textpos}
 
 \begin{document}
-	
+	\onehalfspacing
 	\thispagestyle{empty}
 	
 	\begingroup
@@ -217,8 +219,10 @@ ItalicFont={Verdana Italic},
 	\endgroup
 	
 	
-	\newpage
-	$ $
+	\clearpage
+	\thispagestyle{empty}
+	\null
+	\clearpage
 	
 	\TPoptions{absolute=false}
 	\pagestyle{plain}
@@ -268,7 +272,30 @@ ItalicFont={Verdana Italic},
 	
 	\chapter{Introduzione}
 	
+	\begin{center}
+		\begin{minipage}{1\textwidth}
+			\normalsize
+			CANCELLAREEEEEEEEEEEEEEEE
+			
+			
+			
+			
+			Tra queste rientrano gli scratch hologram, una tecnica di olografia analogica in cui l’illusione di profondità non è ottenuta attraverso interferenza coerente, ma tramite incisioni opportunamente orientate su una superficie riflettente. In questo contesto la tridimensionalità percepita nasce dal comportamento speculare della luce: ogni micro-incisione produce un punto luminoso che si sposta al variare del punto di vista, contribuendo alla ricostruzione visiva di una forma tridimensionale virtuale.
+			Se da un lato la realizzazione manuale di scratch hologram è nota da tempo in ambito artistico e sperimentale, dall’altro la loro generazione a partire da modelli tridimensionali digitali rappresenta un problema computazionale non banale. Non si tratta semplicemente di “proiettare” un modello su un piano, ma di tradurre informazioni geometriche tridimensionali in traiettorie di incisione bidimensionali compatibili con sistemi di fabbricazione numerica.
+			Il punto centrale del problema può essere formulato in questo modo: dato un modello 3D espresso come mesh triangolare, come è possibile generare un insieme di percorsi macchina tali da produrre, su una superficie piana, un effetto visivo coerente con la forma originale? In altre parole, come si passa dal modello 3D al G-code in modo sistematico, riproducibile e indipendente da strumenti proprietari?
+			La presente tesi affronta questo problema attraverso lo sviluppo di una pipeline computazionale implementata in Python. Il sistema accetta in ingresso un modello tridimensionale in formato STL, estrae e campiona i suoi spigoli, li proietta su un piano bidimensionale secondo una configurazione di vista controllata e genera traiettorie di incisione sotto forma di archi. Le traiettorie così ottenute possono essere esportate in formato SVG per la visualizzazione e in G-code per l’eventuale fabbricazione su macchina CNC.
+			L’obiettivo non è quello di implementare un modello fisico completo della riflessione luminosa, ma di formalizzare e rendere riproducibile un approccio geometrico semplificato, sufficiente a produrre un effetto speculare qualitativamente coerente. La pipeline è accompagnata da un’applicazione desktop per la preview interattiva e dalla possibilità di validare visivamente i risultati mediante rendering in ambiente tridimensionale.
+			Il contributo del lavoro consiste dunque nella definizione formale del problema, nella progettazione di un’architettura software coerente con tale formalizzazione e nella realizzazione di un sistema capace di collegare in modo diretto un modello 3D alla generazione di codice macchina per incisione.
+		\end{minipage}
+	\end{center}
+	
 	\section{Contesto e motivazioni}
+	La rappresentazione tridimensionale di oggetti tramite modelli digitali è oggi uno standard consolidato in ambito informatico e ingegneristico. Formati come STL descrivono una superficie attraverso una mesh triangolare, permettendo di manipolare, visualizzare e fabbricare oggetti fisici a partire da una geometria discreta. In molti casi, il passaggio dal modello 3D alla produzione fisica avviene tramite una pipeline ben definita: il modello viene elaborato da uno slicer o da un software CAM, che genera automaticamente le traiettorie macchina necessarie alla stampa o alla lavorazione.
+	Esistono però tecniche di rappresentazione della forma che non si basano sulla produzione volumetrica dell’oggetto, ma sulla generazione controllata di effetti ottici. Gli scratch hologram rientrano in questa categoria: la percezione della tridimensionalità non dipende dalla presenza di un solido, ma dal comportamento della luce riflessa da micro-incisioni realizzate su una superficie piana e riflettente. L’effetto visivo nasce dall’interazione tra direzione di osservazione, direzione della luce e orientazione locale dei graffi.
+	In questo scenario il problema non è più quello di riempire un volume, bensì di determinare una distribuzione di traiettorie bidimensionali capaci di produrre, in condizioni controllate, un comportamento speculare coerente con una geometria tridimensionale di riferimento. Il modello 3D non viene quindi fabbricato direttamente, ma utilizzato come sorgente di informazione geometrica da tradurre in un pattern inciso su un piano.
+	Dal punto di vista computazionale, questa trasformazione non è immediata. Una mesh triangolare descrive superfici attraverso vertici e facce; una macchina CNC, invece, esegue movimenti lungo traiettorie planari espresse in coordinate cartesiane e codificate in G-code. Occorre quindi definire una procedura che colleghi questi due livelli di rappresentazione: da un lato la struttura topologica e geometrica della mesh, dall’altro un insieme ordinato di archi o segmenti compatibili con i vincoli della fabbricazione digitale.
+	Sono disponibili alcuni strumenti open source che affrontano la generazione di scratch hologram a partire da modelli 3D. Tali strumenti dimostrano la fattibilità dell’approccio, ma presentano limiti significativi in termini di stabilità, scalabilità e controllo dei parametri. In particolare, l’esecuzione può risultare instabile anche su modelli geometricamente semplici, rendendo difficile un utilizzo sistematico e riproducibile all’interno di una pipeline di fabbricazione.
+	La motivazione del presente lavoro nasce quindi dall’esigenza di definire una pipeline computazionale chiara, formalizzata e controllabile, capace di trasformare un modello 3D in un insieme di traiettorie di incisione esportabili in modo coerente. L’obiettivo non è soltanto ottenere un effetto visivo, ma costruire un processo riproducibile che renda esplicite le scelte geometriche adottate e che possa essere analizzato, esteso e migliorato nel tempo.
 	\section{Obiettivi della tesi}
 	\section{Contributi del lavoro}
 	\section{Struttura del documento}
