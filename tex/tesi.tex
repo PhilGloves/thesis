@@ -1,0 +1,384 @@
+\documentclass[a4paper,10 pt,titlepage,twoside]{book}
+
+\usepackage[luatex]{color, graphicx}
+
+\usepackage{mathrsfs}
+\usepackage{array,epsfig}
+\usepackage{amsmath}
+\usepackage{eufrak}
+\usepackage{amsfonts}
+\usepackage{mathbbol}
+\usepackage{amssymb}
+\usepackage{amsxtra}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{tikz-cd}
+\usepackage{enumerate}
+\usepackage{tikz}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{a4paper,top=3cm,bottom=3cm,left=3.5cm,right=3.5cm,heightrounded,bindingoffset=5mm}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{emptypage}
+%\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{enumerate}
+\usepackage{indentfirst}
+\usepackage{MnSymbol}
+
+
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\K}{\mathbb{K}}
+\newcommand{\CP}{\mathbb{CP}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\LC}{\mathcal{L}}
+\newcommand{\support}{\mathrm{support}}
+\newcommand{\Oset}{\varnothing}
+\DeclareMathOperator{\id}{id}
+
+\numberwithin{equation}{chapter}
+\renewcommand{\theequation}{\thechapter.\arabic{equation}}
+%per gli spazi:
+\usepackage{setspace}
+\singlespacing
+
+\providecommand\phantomsection{}
+
+
+
+
+%\usepackage{stmaryrd} 
+
+\theoremstyle{plain}
+\newtheorem{thm}{Theorem}[chapter] % reset theorem numbering for each chapter
+
+\theoremstyle{definition}
+\newtheorem{defn}[thm]{Definition} % definition numbers are dependent on theorem numbers
+\newtheorem{ex}[thm]{Example} % same for example numbers
+\newtheorem{rmk}[thm]{Remark}
+\newtheorem{notn}[thm]{Notation}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{prop}[thm]{Proposition}
+
+%Here I define some theorem styles and shortcut commands for symbols I use often
+
+
+
+
+
+%Pagination stuff.
+\setlength{\topmargin}{-.3 in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\evensidemargin}{0in}
+\setlength{\textheight}{9.in}
+\setlength{\textwidth}{6.5in}
+\pagestyle{empty}
+
+
+\DeclareMathOperator{\obj}{Obj}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\mor}{Mor}
+\DeclareMathOperator{\iso}{Iso}
+\DeclareMathOperator{\ve}{vect}
+%\DeclareMathOperator{\diff}{diffmfd}
+\DeclareMathOperator{\g}{\mathfrak{g}}
+\DeclareMathOperator{\1}{\mathbb{1}}
+
+%\DeclareMathOperator{\del}{\partial\!}
+\newcommand{\del}{\partial}
+\DeclareMathOperator{\grad}{grad}
+\DeclareMathOperator{\ind}{ind}
+\DeclareMathOperator{\ch}{ch}
+\DeclareMathOperator{\td}{Td}
+\DeclareMathOperator{\pf}{pf}   
+\DeclareMathOperator{\cl}{Cl}  
+\DeclareMathOperator{\htimes}{\hat{\otimes}}   
+\DeclareRobustCommand{\rchi}{{\mathpalette\irchi\relax}}
+\newcommand{\irchi}[2]{\raisebox{\depth}{$#1\chi$}} % inner command, used by \rchi
+
+\newcommand{\vect}[1]{\ensuremath{\begin{pmatrix}#1\end{pmatrix}}}
+
+% For Spin Geometry
+\DeclareMathOperator{\diff}{\operatorname{Diff}}
+
+% Lineare Algebra %
+\DeclareMathOperator{\rg}{rg}     % Rang
+\DeclareMathOperator{\diag}{diag} % Diagonalmatrix
+\DeclareMathOperator{\Mat}{M}   % Matritzenraum
+\DeclareMathOperator{\Eig}{Eig}   % Eigenräume
+\DeclareMathOperator{\End}{End} 
+\DeclareMathOperator{\Span}{Span} % lineare Huelle
+\DeclareMathOperator{\adj}{adj}   % Adjungierte
+\DeclareMathOperator{\Ann}{Ann}   % Annihilator
+\DeclareMathOperator{\Aut}{Aut}   % Automorphismen Gruppe
+\DeclareMathOperator{\Sp}{Sp}     % Symplektische Gruppe
+\DeclareMathOperator{\GL}{GL}     % Allgemeine Lineare Gruppe
+
+\DeclareMathOperator{\Tr}{Tr}     % Spur
+\DeclareMathOperator{\Ker}{Ker}   % Kern 
+\DeclareMathOperator{\Bild}{Im}   % Bild
+\DeclareMathOperator{\Hom}{Hom}   % Homomorphismen
+\DeclareMathOperator{\sgn}{sgn}   % Signum
+\DeclareMathOperator{\Deg}{Deg}   % Degree
+\DeclareMathOperator{\vol}{vol}   % Signum
+
+
+%\usepackage[backend=bibtex,
+%style=alphabetic,
+%sorting=ynt]{biblatex}
+%\addbibresource{Lit.bib}
+
+\setlength\parindent{24pt}
+
+
+\newcommand{\bigzero}{\mbox{\normalfont\Large\bfseries 0}}
+\newcommand{\rvline}{\hspace*{-\arraycolsep}\vline\hspace*{-\arraycolsep}}
+
+\usepackage{wasysym}
+\newcommand{\heart}{\gamma}
+\renewcommand\epsilon{\varepsilon}
+\renewcommand\phi{\varphi}
+
+
+\usepackage{fontspec}
+\newfontfamily\TahomaFont[
+Scale=1,Ligatures={TeX},
+BoldFont={Tahoma Bold}, 
+ItalicFont={Verdana Italic},
+]{Tahoma}
+
+\usepackage[absolute]{textpos}
+
+\begin{document}
+	
+	\thispagestyle{empty}
+	
+	\begingroup
+	\TahomaFont
+	
+	\begin{textblock*}{4cm}(8.65cm,1.03cm)
+		\centerline {\includegraphics[width=3.67cm]{LogoUniToConvertito.png}}
+	\end{textblock*}
+	
+	
+	\begin{textblock*}{21cm}(0cm,8.98cm)
+		\fontsize{18}{22}\selectfont
+		\centerline {\textbf{ Universit\`a degli Studi di Torino}}
+	\end{textblock*}
+	\begin{textblock*}{21cm}(0cm,9.97cm)
+		\fontsize{18}{22}\selectfont
+		\centerline {\textit{ Corso di Laurea in Informatica}}
+	\end{textblock*}
+	
+	
+	\begin{textblock*}{21cm}(0cm,12.66cm)
+		\fontsize{20}{24}\selectfont
+		\center  {\textbf{Pipeline computazionale per la fabbricazione \\ digitale di scratch hologram: \\ dal modello 3D al G-Code }}
+	\end{textblock*}
+	\begin{textblock*}{21cm}(0cm,16.46cm)
+		\fontsize{18}{22}\selectfont
+		\centerline{\Large {Tesi di Laurea Triennale}}
+	\end{textblock*}
+	
+	
+	
+	\fontsize{14}{17}\selectfont
+	
+	\begin{textblock*}{8cm}(3.04cm,20.26cm)
+		\noindent 
+		\textbf{Relatore}
+	\end{textblock*}
+	\begin{textblock*}{8cm}(3.04cm,20.85cm)
+		\noindent 
+		Bioglio Valerio
+	\end{textblock*}
+	
+	\begin{textblock*}{8cm}(12.33cm,22.95cm)
+		\noindent
+		\textbf{Candidato/a}
+	\end{textblock*}
+	\begin{textblock*}{8cm}(12.33cm,23.55cm)
+		\noindent	\textbf{Guanti Filippo}
+	\end{textblock*}
+	\begin{textblock*}{8cm}(12.33cm,24.14cm)
+		\noindent	Matricola 893412
+	\end{textblock*}
+	
+	\begin{textblock*}{21cm}(0cm,27.34cm)
+		\centerline{Anno Accademico 2024/2025}
+	\end{textblock*}
+	
+	\endgroup
+	
+	
+	\newpage
+	$ $
+	
+	\TPoptions{absolute=false}
+	\pagestyle{plain}
+	\frontmatter
+	
+	%\newpage
+	
+	% ----- Pagina dichiarazione -----
+	\thispagestyle{empty}
+	
+	\vspace*{4cm}
+	
+	\begin{center}
+		\begin{minipage}{0.8\textwidth}
+			\small
+			Dichiaro di essere responsabile del contenuto dell’elaborato che 
+			presento al fine del conseguimento del titolo, di non avere plagiato in tutto o in parte il lavoro prodotto da altri e di aver citato
+			le fonti originali in modo congruente alle normative vigenti in
+			materia di plagio e di diritto d’autore. Sono inoltre consapevole
+			che nel caso la mia dichiarazione risultasse mendace, potrei incorrere nelle sanzioni previste dalla legge e la mia ammissione
+			alla prova finale potrebbe essere negata.
+		\end{minipage}
+	\end{center}
+	
+	\clearpage
+	
+	% ----- Pagina vuota -----
+	\thispagestyle{empty}
+	\null
+	\clearpage
+	
+	
+	% ----- ABSTRACT -----
+	\thispagestyle{plain}
+	
+	\chapter*{Abstract}
+	\addcontentsline{toc}{chapter}{Abstract}
+	
+	Gli scratch hologram rappresentano una tecnica di olografia analogica che consente di ottenere l’illusione di profondità tridimensionale attraverso l’incisione di micro-traiettorie su superfici riflettenti. La progettazione di tali strutture richiede la trasformazione di informazioni geometriche tridimensionali in percorsi di incisione compatibili con sistemi di fabbricazione digitale. Questa tesi presenta una pipeline software per la generazione di scratch hologram a partire da modelli tridimensionali in formato STL, finalizzata alla generazione di traiettorie di incisione su superfici riflettenti. L’approccio adottato, implementato in Python, integra il caricamento della mesh, l’estrazione e il campionamento degli spigoli, la proiezione sul piano 2D e la generazione di archi secondo un modello geometrico semplificato di riflessione speculare. Il sistema produce output in formato SVG e G-code, in funzione della geometria delle traiettorie generate. È stata inoltre sviluppata un’applicazione desktop per la preview interattiva e la regolazione dei parametri principali, garantendo coerenza tra simulazione ed esportazione. Il contributo del lavoro consiste nello sviluppo di una soluzione riproducibile e indipendente da strumenti proprietari, concepita come base estendibile per l’ottimizzazione dei percorsi CNC, la validazione sperimentale e future applicazioni nella fabbricazione di scratch hologram.
+	
+	\clearpage
+	
+	\tableofcontents
+	\clearpage
+	
+	\mainmatter
+	
+	\chapter{Introduzione}
+	
+	\section{Contesto e motivazioni}
+	\section{Obiettivi della tesi}
+	\section{Contributi del lavoro}
+	\section{Struttura del documento}
+	
+	\chapter{Fondamenti teorici}
+	
+	\section{Scratch hologram e olografia analogica}
+	\section{Riflessione speculare e modello geometrico}
+	\subsection{Direzione della luce e direzione di osservazione}
+	\subsection{Condizione di riflessione}
+	\section{Proiezione tridimensionale su piano bidimensionale}
+	\section{Dal punto 3D alla traiettoria di incisione}
+%	
+	\chapter{Stato dell’arte}
+	
+	\section{Scratch hologram manuali e approcci artistici}
+	\section{Strumenti software esistenti}
+	\subsection{Soluzioni open-source}
+	\subsection{Limiti rispetto alla fabbricazione digitale}
+	\section{Tecniche affini nella fabbricazione computazionale}
+	\section{Posizionamento del presente lavoro}
+	
+	\chapter{Formalizzazione del problema}
+	
+	\section{Definizione della mesh triangolare}
+	\section{Estrazione e rappresentazione degli spigoli}
+	\section{Definizione dei parametri di vista e illuminazione}
+	\section{Modello matematico per la generazione degli archi}
+	\section{Problema della visibilità e dell’occlusione}
+	
+	\chapter{Architettura della pipeline computazionale}
+	
+	\section{Panoramica generale del sistema}
+	\section{Caricamento e preprocessing del modello STL}
+	\section{Campionamento degli spigoli}
+	\section{Generazione delle traiettorie}
+	\section{Culling e filtraggio delle traiettorie}
+	\section{Esportazione in formato SVG}
+	\section{Generazione del G-code}
+	\section{Applicazione desktop per preview e parametrizzazione}
+	
+	\chapter{Implementazione}
+	
+	\section{Struttura modulare del software}
+	\section{Scelte progettuali e librerie utilizzate}
+	\section{Parametri configurabili}
+	\section{Gestione delle prestazioni computazionali}
+	\section{Problemi incontrati e soluzioni adottate}
+	
+	\chapter{Dal modello 3D al G-code}
+	
+	\section{Rappresentazione degli archi in ambiente CNC}
+	\section{Conversione in comandi G2/G3}
+	\section{Gestione delle unità e precisione numerica}
+	\section{Vincoli e limiti delle macchine CNC}
+	\section{Coerenza tra simulazione e fabbricazione}
+	
+	\chapter{Validazione e risultati}
+	
+	\section{Caso studio: modello cubico}
+	\section{Caso studio: poliedro complesso (d20)}
+	\section{Analisi dell’influenza dei parametri}
+	\section{Valutazione qualitativa della resa visiva}
+	\section{Discussione dei risultati}
+	
+	\chapter{Limiti e sviluppi futuri}
+	
+	\section{Limiti del modello geometrico adottato}
+	\section{Miglioramento del culling tramite metodi di visibilità avanzati}
+	\section{Estensione a modelli ottici più accurati}
+	\section{Ottimizzazione dei percorsi CNC}
+	\section{Validazione sperimentale su incisione reale}
+	
+	\chapter{Conclusioni}
+	
+	\section{Sintesi dei risultati}
+	\section{Contributo della tesi}
+	\section{Prospettive di ricerca future}
+	
+
+	\chapter{Title of the third chapter}
+	A quotation \cite{APS1}
+	
+	A reference to a numbered formula \eqref{ps:2}
+	
+	A reference to the first section of the first chapter \ref{sec:11}
+	
+	\chapter*{Ringraziamenti}
+	
+	Ringraziamenti
+	
+	\phantom{p. 1}
+	\clearpage
+	\thispagestyle{empty}
+	\phantom{p. 2}
+	\clearpage
+	\addcontentsline{toc}{chapter}{References}
+	
+	\begin{thebibliography}{9}
+		\bibitem{APS1}
+		M. F. Atiyah, V. K. Patodi, I. M. Singer (1975), \emph{Spectral asymmetry and Riemannian geometry. I}, Math.Proc. Cambridge Philos. Soc. \textbf{77}, 43-69.
+		
+		\bibitem{APS2}
+		M. F. Atiyah, V. K. Patodi, I. M. Singer (1975), \emph{Spectral asymmetry and Riemannian geometry. II}, Math.Proc. Cambridge Philos. Soc. \textbf{78}, no. 3, 405-432.
+		
+		\bibitem{APS3}
+		M. F. Atiyah, V. K. Patodi, I. M. Singer (1976), \emph{Spectral asymmetry and Riemannian geometry. III}, Math.Proc. Cambridge Philos. Soc. \textbf{79}, no. 1, 71-99.
+		
+	\end{thebibliography}
+	
+	
+	
+\end{document}
