@@ -16,6 +16,7 @@
 \usepackage{tikz-cd}
 \usepackage{enumerate}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning}
 \usepackage{lmodern}
 \usepackage[english]{babel}
 \usepackage{geometry}
@@ -272,42 +273,104 @@ ItalicFont={Verdana Italic},
 	
 	\chapter{Introduzione}
 	
-	\begin{center}
-		\begin{minipage}{1\textwidth}
-			\normalsize
-			CANCELLAREEEEEEEEEEEEEEEE
-			
-			
-			
-			
-			Tra queste rientrano gli scratch hologram, una tecnica di olografia analogica in cui l’illusione di profondità non è ottenuta attraverso interferenza coerente, ma tramite incisioni opportunamente orientate su una superficie riflettente. In questo contesto la tridimensionalità percepita nasce dal comportamento speculare della luce: ogni micro-incisione produce un punto luminoso che si sposta al variare del punto di vista, contribuendo alla ricostruzione visiva di una forma tridimensionale virtuale.
-			Se da un lato la realizzazione manuale di scratch hologram è nota da tempo in ambito artistico e sperimentale, dall’altro la loro generazione a partire da modelli tridimensionali digitali rappresenta un problema computazionale non banale. Non si tratta semplicemente di “proiettare” un modello su un piano, ma di tradurre informazioni geometriche tridimensionali in traiettorie di incisione bidimensionali compatibili con sistemi di fabbricazione numerica.
-			Il punto centrale del problema può essere formulato in questo modo: dato un modello 3D espresso come mesh triangolare, come è possibile generare un insieme di percorsi macchina tali da produrre, su una superficie piana, un effetto visivo coerente con la forma originale? In altre parole, come si passa dal modello 3D al G-code in modo sistematico, riproducibile e indipendente da strumenti proprietari?
-			La presente tesi affronta questo problema attraverso lo sviluppo di una pipeline computazionale implementata in Python. Il sistema accetta in ingresso un modello tridimensionale in formato STL, estrae e campiona i suoi spigoli, li proietta su un piano bidimensionale secondo una configurazione di vista controllata e genera traiettorie di incisione sotto forma di archi. Le traiettorie così ottenute possono essere esportate in formato SVG per la visualizzazione e in G-code per l’eventuale fabbricazione su macchina CNC.
-			L’obiettivo non è quello di implementare un modello fisico completo della riflessione luminosa, ma di formalizzare e rendere riproducibile un approccio geometrico semplificato, sufficiente a produrre un effetto speculare qualitativamente coerente. La pipeline è accompagnata da un’applicazione desktop per la preview interattiva e dalla possibilità di validare visivamente i risultati mediante rendering in ambiente tridimensionale.
-			Il contributo del lavoro consiste dunque nella definizione formale del problema, nella progettazione di un’architettura software coerente con tale formalizzazione e nella realizzazione di un sistema capace di collegare in modo diretto un modello 3D alla generazione di codice macchina per incisione.
-		\end{minipage}
-	\end{center}
-	
 	\section{Contesto e motivazioni}
-	La rappresentazione tridimensionale di oggetti tramite modelli digitali è oggi uno standard consolidato in ambito informatico e ingegneristico. Formati come STL descrivono una superficie attraverso una mesh triangolare, permettendo di manipolare, visualizzare e fabbricare oggetti fisici a partire da una geometria discreta. In molti casi, il passaggio dal modello 3D alla produzione fisica avviene tramite una pipeline ben definita: il modello viene elaborato da uno slicer o da un software CAM, che genera automaticamente le traiettorie macchina necessarie alla stampa o alla lavorazione.
-	Esistono però tecniche di rappresentazione della forma che non si basano sulla produzione volumetrica dell’oggetto, ma sulla generazione controllata di effetti ottici. Gli scratch hologram rientrano in questa categoria: la percezione della tridimensionalità non dipende dalla presenza di un solido, ma dal comportamento della luce riflessa da micro-incisioni realizzate su una superficie piana e riflettente. L’effetto visivo nasce dall’interazione tra direzione di osservazione, direzione della luce e orientazione locale dei graffi.
-	In questo scenario il problema non è più quello di riempire un volume, bensì di determinare una distribuzione di traiettorie bidimensionali capaci di produrre, in condizioni controllate, un comportamento speculare coerente con una geometria tridimensionale di riferimento. Il modello 3D non viene quindi fabbricato direttamente, ma utilizzato come sorgente di informazione geometrica da tradurre in un pattern inciso su un piano.
-	Dal punto di vista computazionale, questa trasformazione non è immediata. Una mesh triangolare descrive superfici attraverso vertici e facce; una macchina CNC, invece, esegue movimenti lungo traiettorie planari espresse in coordinate cartesiane e codificate in G-code. Occorre quindi definire una procedura che colleghi questi due livelli di rappresentazione: da un lato la struttura topologica e geometrica della mesh, dall’altro un insieme ordinato di archi o segmenti compatibili con i vincoli della fabbricazione digitale.
-	Sono disponibili alcuni strumenti open source che affrontano la generazione di scratch hologram a partire da modelli 3D. Tali strumenti dimostrano la fattibilità dell’approccio, ma presentano limiti significativi in termini di stabilità, scalabilità e controllo dei parametri. In particolare, l’esecuzione può risultare instabile anche su modelli geometricamente semplici, rendendo difficile un utilizzo sistematico e riproducibile all’interno di una pipeline di fabbricazione.
-	La motivazione del presente lavoro nasce quindi dall’esigenza di definire una pipeline computazionale chiara, formalizzata e controllabile, capace di trasformare un modello 3D in un insieme di traiettorie di incisione esportabili in modo coerente. L’obiettivo non è soltanto ottenere un effetto visivo, ma costruire un processo riproducibile che renda esplicite le scelte geometriche adottate e che possa essere analizzato, esteso e migliorato nel tempo.
+	La rappresentazione tridimensionale tramite modelli digitali costituisce uno strumento consolidato in ambito informatico e ingegneristico. Formati come STL descrivono un oggetto attraverso una mesh triangolare, permettendo di manipolarne la geometria e, in molti casi, di fabbricarlo fisicamente. Il passaggio dal modello 3D alla produzione avviene normalmente attraverso una pipeline definita: il modello viene elaborato da uno slicer o da un software CAM che genera le traiettorie macchina necessarie alla stampa o alla lavorazione.
+	Esistono però modalità di rappresentazione della forma che non si basano sulla produzione volumetrica dell’oggetto, ma sulla generazione controllata di effetti ottici. Tra queste rientrano gli scratch hologram, una tecnica di olografia analogica in cui l’illusione di profondità non è ottenuta tramite interferenza coerente, ma attraverso incisioni opportunamente orientate su una superficie riflettente. La tridimensionalità percepita nasce dal comportamento speculare della luce: ogni micro-incisione produce un punto luminoso che si sposta al variare del punto di vista, contribuendo alla ricostruzione visiva di una forma tridimensionale virtuale.
+	In questo contesto il modello 3D non viene fabbricato direttamente, ma utilizzato come sorgente di informazione geometrica. Il problema non è più quello di riempire un volume, bensì di determinare una distribuzione di traiettorie bidimensionali capaci di produrre, in condizioni controllate, un comportamento speculare coerente con una geometria tridimensionale di riferimento. Non si tratta semplicemente di proiettare un modello su un piano, ma di tradurre informazioni geometriche tridimensionali in percorsi di incisione compatibili con i vincoli di una macchina CNC.
+	Dal punto di vista computazionale, questa trasformazione non è immediata. Una mesh triangolare descrive superfici tramite vertici e facce; una macchina a controllo numerico esegue movimenti planari codificati in G-code. Occorre quindi definire una procedura che colleghi questi due livelli di rappresentazione: da un lato la struttura topologica e geometrica della mesh, dall’altro un insieme ordinato di archi o segmenti idonei alla fabbricazione.
+	Sono disponibili strumenti open source che affrontano la generazione di scratch hologram a partire da modelli tridimensionali. Tali soluzioni mostrano la fattibilità dell’approccio, ma presentano limiti in termini di stabilità e controllo del processo. In particolare, l’esecuzione può risultare instabile anche su modelli geometricamente semplici, rendendo difficile un utilizzo sistematico e riproducibile all’interno di una pipeline di fabbricazione digitale.
+	
+	La motivazione del presente lavoro nasce dall’esigenza di definire una pipeline computazionale chiara e formalizzata, capace di trasformare un modello 3D in un insieme di traiettorie di incisione esportabili in modo coerente. L’obiettivo non è implementare un modello fisico completo della riflessione luminosa, ma costruire un approccio geometrico esplicito e riproducibile, che renda trasparenti le scelte adottate e che possa essere analizzato e migliorato nel tempo. Il problema centrale può essere sintetizzato nel seguente modo: dato un modello 3D espresso come mesh triangolare, come generare un insieme di percorsi macchina tali da produrre, su una superficie piana, un effetto visivo coerente con la forma originale?
+	
 	\section{Obiettivi della tesi}
+	L’obiettivo principale della presente tesi è definire e implementare una pipeline computazionale capace di trasformare un modello tridimensionale, espresso come mesh triangolare in formato STL, in un insieme di traiettorie di incisione bidimensionali esportabili in G-code. Il problema viene affrontato in termini geometrici, ponendo al centro la relazione tra rappresentazione discreta della superficie e generazione di percorsi macchina compatibili con la fabbricazione su piano. Un primo obiettivo consiste quindi nella formalizzazione del passaggio dal dominio tridimensionale al dominio bidimensionale, individuando quali elementi della mesh siano significativi ai fini della generazione del pattern inciso e come debbano essere trattati dal punto di vista matematico. In particolare, si intende definire un modello operativo per l’estrazione e il campionamento degli spigoli della mesh, la loro proiezione su un piano secondo una configurazione di vista controllata e la successiva generazione di archi che rappresentino le micro-incisioni responsabili dell’effetto speculare.
+	Un secondo obiettivo consiste nell’analisi critica di strumenti software esistenti per la generazione di scratch hologram a partire da modelli tridimensionali, con particolare attenzione alla loro struttura interna, ai limiti di stabilità e alle scelte geometriche implicite. A partire da tale analisi, il lavoro si propone di rielaborare e sistematizzare una pipeline operativa, rendendone espliciti i passaggi fondamentali e verificandone il comportamento su casi di test controllati. Questo processo non si limita all’utilizzo dello strumento, ma mira a comprenderne il funzionamento, evidenziarne le criticità e introdurre modifiche mirate volte a migliorarne la controllabilità e la coerenza con l’obiettivo di fabbricazione digitale.
+	Un ulteriore obiettivo è garantire la coerenza tra simulazione e fabbricazione, assicurando che le traiettorie visualizzate in fase di preview corrispondano effettivamente a quelle esportate in formato SVG e G-code. Ciò implica la gestione delle convenzioni di coordinate, delle trasformazioni di scala e dei vincoli numerici propri delle macchine CNC. La tesi non si propone di sviluppare un modello fisico completo della riflessione luminosa, ma di costruire un approccio geometrico semplificato, sufficientemente controllabile da produrre un effetto visivo qualitativamente coerente con il modello tridimensionale di partenza. L’obiettivo finale è quindi fornire una soluzione autonoma e analizzabile, che colleghi in modo esplicito il modello 3D alla generazione del codice macchina, costituendo una base solida per eventuali estensioni future sia in ambito computazionale sia in ambito sperimentale.
+	
 	\section{Contributi del lavoro}
-	\section{Struttura del documento}
+	Il contributo principale del lavoro consiste nella formalizzazione esplicita del processo che consente di passare da un modello tridimensionale espresso come mesh triangolare alla generazione di traiettorie di incisione bidimensionali esportabili in G-code. In particolare, è stata condotta un’analisi critica di un software open source esistente, originariamente sviluppato in C++, seguita da una reimplementazione in Python della sua logica geometrica, con l’obiettivo di migliorarne stabilità, controllabilità e integrazione all’interno di una pipeline di fabbricazione digitale.
+	Un primo contributo riguarda la definizione operativa del modello geometrico adottato per la generazione degli archi a partire dagli spigoli della mesh, chiarendo il ruolo della configurazione di vista, della proiezione e dei parametri di campionamento. Un secondo contributo consiste nell’integrazione coerente tra fase di preview e fase di esportazione, garantendo che le traiettorie visualizzate in ambiente desktop coincidano con quelle effettivamente convertite in formato SVG e G-code. È stata inoltre condotta un’analisi del problema della visibilità e dell’occlusione tramite un approccio conservativo basato su Z-buffer, con l’obiettivo di ridurre la generazione di incisioni non visibili dal punto di vista selezionato. Il lavoro include infine una valutazione sperimentale della pipeline su modelli geometrici di complessità crescente, evidenziandone comportamento, limiti e possibili direzioni di miglioramento. Nel complesso, il contributo della tesi non risiede nell’introduzione di un nuovo modello ottico, ma nella costruzione di un processo computazionale esplicito, analizzabile e riproducibile che collega in modo diretto la rappresentazione tridimensionale alla fabbricazione digitale su piano.
 	
 	\chapter{Fondamenti teorici}
 	
 	\section{Scratch hologram e olografia analogica}
+	
+	Gli scratch hologram costituiscono una tecnica di rappresentazione tridimensionale basata su incisioni realizzate su superfici riflettenti. A differenza dell’olografia interferometrica tradizionale, fondata sulla registrazione del fronte d’onda tramite interferenza di luce coerente, gli scratch hologram operano nel dominio dell’ottica geometrica. L’effetto tridimensionale non deriva dalla ricostruzione della fase dell’onda luminosa, ma dal controllo della riflessione speculare.
+	
+	Il principio alla base di questa tecnica è riconducibile alla cosiddetta \emph{specular holography}, formalizzata in modo sistematico da Brand \cite{Brand2011}. In tale approccio, una superficie opportunamente sagomata è progettata in modo da riflettere la luce verso l’osservatore secondo traiettorie controllate, producendo punti luminosi la cui posizione apparente varia al variare del punto di vista. Il sistema visivo interpreta questo spostamento come informazione di profondità, generando la percezione di una forma tridimensionale.
+	
+		\begin{figure}[h]
+		\centering
+		\includegraphics[width=0.8\textwidth]{fig_specular_principle.png}
+		\caption{Principio della specular holography: per diverse posizioni dell’osservatore, la riflessione speculare genera riflessi che si allineano verso un punto tridimensionale percepito. Immagine adattata da M.~Brand, zintaglio.com, licenza CC BY-NC-SA 3.0.}
+		\label{fig:specular_principle}
+	\end{figure}
+	
+	Nel caso degli scratch hologram, la superficie speculare ideale viene approssimata tramite incisioni discrete, spesso sotto forma di archi o curve semplici. Ogni micro-incisione agisce come un elemento direzionale di riflessione: al variare della direzione di osservazione, il punto di massima luminosità associato alla curva incisa si sposta lungo una traiettoria percepita nello spazio. L’insieme coordinato di tali incisioni permette di simulare una geometria tridimensionale virtuale.
+	
+	La generazione computazionale di strutture di questo tipo è stata affrontata in ambito grafico e ottico con diversi approcci. Regg et al. hanno introdotto il concetto di \emph{computational highlight holography}, proponendo un metodo per derivare micro-superfici speculari a partire da modelli tridimensionali digitali \cite{Regg2010}. In modo analogo, Augier Calderín e Sánchez Pérez hanno studiato la possibilità di generare scratch hologram mediante elaborazione software e incisione laser, definendo il termine \emph{hologravure} per indicare una generalizzazione digitale della tecnica \cite{Augier2008, Hologravure2011}.
+	È importante sottolineare che queste tecniche non ricostruiscono un fronte d’onda nel senso fisico dell’olografia classica, ma producono un’illusione tridimensionale efficace entro un intervallo limitato di condizioni di osservazione. Il modello adottato nella presente tesi si colloca in questo quadro: l’obiettivo non è la simulazione completa dei fenomeni ondulatori, bensì la definizione di una procedura geometrica che consenta di generare traiettorie di incisione coerenti con il comportamento speculare atteso.
+	
+
+
 	\section{Riflessione speculare e modello geometrico}
+	
+	Il funzionamento degli scratch hologram si basa sulla legge della riflessione speculare, secondo cui l’angolo di incidenza di un raggio luminoso rispetto alla normale alla superficie è uguale all’angolo di riflessione. In termini vettoriali, se si indica con $\mathbf{l}$ la direzione della luce incidente, con $\mathbf{e}$ la direzione dell’osservatore e con $\mathbf{n}$ la normale locale alla superficie, la condizione di riflessione implica che la direzione riflessa sia simmetrica rispetto alla normale. Questo vincolo costituisce il fondamento geometrico delle tecniche di specular holography descritte in \cite{Brand2011}.
+	Nel caso ideale considerato da Brand, la superficie viene progettata in modo tale che, per ogni punto virtuale della scena tridimensionale, esista una configurazione locale della normale che invii la luce verso l’osservatore secondo la legge della riflessione. La superficie risultante può essere interpretata come l’inviluppo di un insieme di condizioni geometriche imposte dalle direzioni di luce e osservazione. Questo approccio fornisce una descrizione continua del problema.
+	
+	Nel caso degli scratch hologram, la superficie continua viene approssimata mediante incisioni discrete. Invece di modellare esplicitamente una superficie tridimensionale con normale variabile punto per punto, si utilizzano curve incise su un piano riflettente. Ogni curva è progettata in modo tale che, per una certa configurazione di osservazione, produca un punto luminoso coerente con la posizione di un punto tridimensionale di riferimento. Il modello geometrico risulta quindi semplificato: non si impone la condizione di riflessione per ogni possibile direzione, ma si considera una configurazione di vista controllata e si costruiscono traiettorie che approssimano il comportamento speculare desiderato.
+	Dal punto di vista matematico, il problema può essere formulato come segue. Dato un punto tridimensionale $\mathbf{P}$ appartenente al modello e una configurazione di osservazione definita da una posizione dell’occhio e da una direzione della luce, si intende determinare una curva sul piano di incisione tale che la riflessione speculare generata lungo tale curva produca, per l’osservatore, un riflesso associabile a $\mathbf{P}$. Nel contesto della presente tesi, questa relazione viene trattata in modo geometrico e discreto, assumendo una configurazione di vista fissata e derivando le traiettorie di incisione a partire dalla proiezione del modello tridimensionale.
+	
 	\subsection{Direzione della luce e direzione di osservazione}
+	
+	La condizione di riflessione speculare dipende in modo esplicito dalla relazione tra direzione della luce incidente e direzione dell’osservatore. Sia $\mathbf{L}$ il vettore che individua la direzione della luce nel punto considerato e sia $\mathbf{E}$ il vettore che individua la direzione verso l’occhio dell’osservatore. Indicando con $\mathbf{n}$ la normale locale alla superficie riflettente, la legge della riflessione impone che il vettore riflesso sia simmetrico rispetto alla normale, e quindi che $\mathbf{n}$ risulti allineato con il bisettore tra $\mathbf{L}$ e $\mathbf{E}$ \cite{Brand2011}. In forma normalizzata, la condizione può essere espressa richiedendo che la normale sia proporzionale al vettore $\mathbf{L} + \mathbf{E}$ opportunamente normalizzato.
+	Questa relazione evidenzia un aspetto fondamentale: il comportamento speculare non è una proprietà intrinseca della sola superficie, ma dipende dalla configurazione geometrica del sistema luce–osservatore. Variando la posizione dell’occhio o la direzione della sorgente luminosa, la condizione di riflessione viene soddisfatta in punti differenti della superficie. Di conseguenza, il riflesso associato a una determinata incisione si sposta nello spazio percepito al variare del punto di vista.
+	
+	Nel caso generale della specular holography, si considera un intervallo continuo di direzioni di osservazione e si progetta una superficie in grado di soddisfare la condizione di riflessione per ciascuna di esse. Nel contesto degli scratch hologram, invece, si assume tipicamente una configurazione di riferimento fissata, definita da una posizione dell’osservatore e da una direzione della luce considerate costanti. Il problema viene quindi ridotto alla determinazione di traiettorie di incisione che risultino coerenti con tale configurazione.
+	Dal punto di vista modellistico, è necessario introdurre un sistema di riferimento in cui descrivere le posizioni dei punti del modello tridimensionale, la posizione dell’osservatore e la direzione della luce. In questa tesi si adotta un approccio geometrico in cui il modello 3D viene espresso in uno spazio cartesiano tridimensionale, mentre l’osservatore è descritto da una posizione e da una direzione di vista. La luce può essere trattata, in prima approssimazione, come una sorgente direzionale. Questa semplificazione consente di formulare il problema in termini puramente vettoriali, senza ricorrere a un modello fotometrico completo.
+	
 	\subsection{Condizione di riflessione}
+	
+	La condizione di riflessione speculare, nella sua forma generale, impone che la direzione riflessa sia simmetrica rispetto alla normale locale alla superficie. Se si indica con $\mathbf{l}$ la direzione della luce incidente, con $\mathbf{e}$ la direzione verso l’osservatore e con $\mathbf{n}$ la normale unitaria alla superficie nel punto considerato, la legge della riflessione richiede che il vettore riflesso coincida con $\mathbf{e}$ e che valga la relazione
+	
+	\[
+	\mathbf{e} = \mathbf{l} - 2 (\mathbf{l} \cdot \mathbf{n}) \mathbf{n}.
+	\]
+	
+	In forma equivalente, la normale deve risultare allineata con il bisettore delle direzioni di luce e osservazione, come discusso in \cite{Brand2011}.
+	
+	Nel modello adottato nella presente tesi, tale condizione viene considerata in forma semplificata. Il sistema non prevede una modellazione esplicita e indipendente della sorgente luminosa, ma assume una configurazione in cui la direzione della luce è coerente con la direzione di osservazione. In termini operativi, la direzione di vista è definita a partire dalla posizione della camera e dal punto di interesse, e viene utilizzata come riferimento principale per la generazione delle traiettorie.
+	Questa scelta comporta una riduzione del problema: invece di imporre la condizione di riflessione per una coppia generica luce–osservatore, si considera una configurazione di vista fissata e si generano incisioni coerenti con essa. Il modello non mira quindi a soddisfare la legge della riflessione per un insieme continuo di direzioni, ma a produrre un comportamento speculare plausibile rispetto alla configurazione adottata.
+	Dal punto di vista computazionale, la coerenza con la condizione di riflessione non viene verificata tramite un calcolo diretto delle normali di una superficie speculare continua, ma è incorporata nella costruzione geometrica delle traiettorie a partire dalla proiezione del modello tridimensionale. La profondità dei punti proiettati viene valutata nello spazio di vista, utilizzando la coordinata lungo l’asse ottico per determinare la visibilità relativa, mentre l’orientazione delle incisioni è derivata dalla geometria proiettata del modello. In questo modo, la condizione di riflessione è trattata come vincolo geometrico di riferimento, piuttosto che come equazione da soddisfare puntualmente in ogni punto della superficie.
+	
 	\section{Proiezione tridimensionale su piano bidimensionale}
+	
+	La generazione delle traiettorie di incisione avviene a partire dalla proiezione del modello tridimensionale su un piano bidimensionale. Tale passaggio richiede la definizione esplicita di una trasformazione che consenta di passare dallo spazio del modello allo spazio di vista e successivamente allo spazio immagine.
+	Si consideri un modello descritto da un insieme di vertici $\mathbf{X} \in \mathbb{R}^3$ espressi in un sistema di riferimento cartesiano. La configurazione di osservazione è definita da una posizione della camera $\mathbf{p_o}$ e da un punto di riferimento $\mathbf{p_r}$ verso cui la camera è orientata. A partire da tali grandezze viene costruita una base ortonormale di vista costituita da tre vettori: un asse orizzontale, un asse verticale e un asse ottico orientato dalla scena verso la camera. La trasformazione modello–vista è quindi rappresentata da una matrice omogenea che realizza una rototraslazione rigida dei punti del modello nello spazio di vista.
+	Nel sistema adottato, i punti situati di fronte alla camera risultano avere coordinata $z$ negativa nello spazio di vista. Ai fini del calcolo della profondità, viene quindi utilizzata la quantità $-z_{view}$, che assume valori positivi per i punti visibili lungo la direzione di osservazione. Questa scelta semplifica il confronto tra profondità durante le fasi di filtraggio e gestione dell’occlusione.
+	Successivamente, i punti nello spazio di vista vengono sottoposti a una trasformazione proiettiva che li mappa sul piano immagine. La proiezione è implementata tramite una matrice prospettica parametrizzata da un fattore $z_f$, che controlla il denominatore della trasformazione omogenea. Per valori elevati di $z_f$, la trasformazione tende ad approssimare una proiezione ortografica; per valori più piccoli, l’effetto prospettico risulta più marcato. Nel contesto della presente tesi si privilegia una configurazione prossima all’ortografia, in modo da ridurre deformazioni prospettiche accentuate e ottenere una corrispondenza più stabile tra modello proiettato e traiettorie generate.
+	Dopo la trasformazione prospettica, viene applicata una scalatura uniforme e una traslazione che mappano le coordinate sul dominio del piano immagine, espresso in pixel. L’asse verticale viene invertito per adeguarsi alla convenzione grafica adottata nei sistemi di rendering bidimensionale, in cui la coordinata $y$ cresce verso il basso.
+	
+	Il risultato della pipeline di proiezione è quindi un insieme di punti espressi come triple $(x, y, d)$, dove $(x, y)$ rappresentano le coordinate sul piano immagine e $d$ rappresenta una misura di profondità derivata dalla coordinata nello spazio di vista. Tali punti costituiscono la base per la generazione delle traiettorie di incisione e per le successive operazioni di filtraggio e gestione della visibilità.
+	
+	La sequenza delle trasformazioni applicate ai punti del modello è riassunta in Figura~\ref{fig:pipeline_proiezione}.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.9\textwidth]{diagramma_proiezione.png}
+		\caption[Diagramma della pipeline di proiezione]{Diagramma schematico che illustra la trasformazione dei punti del modello $\mathbf{X}$ attraverso i diversi sistemi di riferimento (Mondo, Vista, Proiettato, Immagine) fino alla generazione delle triple $(x, y, d)$. Il diagramma evidenzia il calcolo della profondità $d = -z_{view}$ e l'inversione dell'asse verticale nel piano immagine.}
+		\label{fig:pipeline_proiezione}
+	\end{figure}
+	
+	
 	\section{Dal punto 3D alla traiettoria di incisione}
+	
+	Una volta definita la trasformazione che consente di proiettare il modello tridimensionale sul piano immagine, occorre stabilire in che modo le informazioni geometriche del modello vengano tradotte in traiettorie di incisione. Il passaggio non è diretto: la mesh triangolare descrive una superficie tramite vertici e facce, mentre l’incisione avviene lungo curve bidimensionali tracciate su un piano.
+	Nel modello adottato, l’attenzione è rivolta in primo luogo agli spigoli della mesh. Gli spigoli rappresentano discontinuità geometriche o cambiamenti di orientazione tra facce adiacenti e costituiscono elementi informativi significativi della forma. A partire dalla mesh, viene quindi costruito un insieme di spigoli univoci, eliminando quelli coplanari quando le facce adiacenti condividono la stessa normale entro una certa tolleranza. Questa scelta consente di ridurre l’effetto della triangolazione interna e di concentrarsi sugli elementi strutturali del modello.
+	Ogni spigolo viene successivamente campionato con una densità controllata da un parametro di risoluzione lineare. Il campionamento produce un insieme discreto di punti tridimensionali appartenenti agli spigoli. Ciascun punto campionato viene quindi trasformato nello spazio di vista e proiettato sul piano bidimensionale secondo la procedura descritta nella sezione precedente, ottenendo coordinate $(x, y)$ sul piano immagine e una misura di profondità associata.
+	A questo punto interviene il modello geometrico per la generazione delle traiettorie di incisione. Per ogni punto proiettato viene costruita una curva, tipicamente un arco circolare o ellittico, definita nello spazio bidimensionale. La geometria dell’arco dipende dalla posizione del punto proiettato e dalla sua profondità relativa rispetto alla configurazione di vista. In termini operativi, la profondità influenza l’estensione e la posizione dell’arco nel piano, mentre la proiezione determina il centro o il riferimento geometrico della traiettoria.
+	L’insieme degli archi generati a partire dai punti campionati costituisce il pattern di incisione. Tale insieme non rappresenta una ricostruzione continua della superficie speculare ideale, ma un’approssimazione discreta ottenuta a partire da elementi locali della mesh. La qualità dell’effetto percepito dipende dalla densità di campionamento, dalla configurazione di vista e dai parametri che regolano la generazione delle curve.
+	Il passaggio dal punto tridimensionale alla traiettoria bidimensionale può quindi essere interpretato come una trasformazione composta: selezione di un elemento significativo della mesh, campionamento discreto, proiezione nello spazio immagine e costruzione di una curva parametrica nel piano. Questa sequenza di operazioni costituisce il nucleo concettuale della pipeline sviluppata nel presente lavoro.
 %	
 	\chapter{Stato dell’arte}
 	
@@ -395,14 +458,26 @@ ItalicFont={Verdana Italic},
 	\addcontentsline{toc}{chapter}{References}
 	
 	\begin{thebibliography}{9}
-		\bibitem{APS1}
-		M. F. Atiyah, V. K. Patodi, I. M. Singer (1975), \emph{Spectral asymmetry and Riemannian geometry. I}, Math.Proc. Cambridge Philos. Soc. \textbf{77}, 43-69.
 		
-		\bibitem{APS2}
-		M. F. Atiyah, V. K. Patodi, I. M. Singer (1975), \emph{Spectral asymmetry and Riemannian geometry. II}, Math.Proc. Cambridge Philos. Soc. \textbf{78}, no. 3, 405-432.
+		\bibitem{Brand2011}
+		M. Brand (2011),
+		\emph{Specular holography},
+		Applied Optics, Vol. 50, No. 25, pp. 5042--5052.
 		
-		\bibitem{APS3}
-		M. F. Atiyah, V. K. Patodi, I. M. Singer (1976), \emph{Spectral asymmetry and Riemannian geometry. III}, Math.Proc. Cambridge Philos. Soc. \textbf{79}, no. 1, 71-99.
+		\bibitem{Regg2010}
+		C. Regg, S. Rusinkiewicz, W. Matusik, M. Gross (2010),
+		\emph{Computational Highlight Holography},
+		ACM Transactions on Graphics (Proceedings of SIGGRAPH Asia 2010), Vol. 29, No. 6.
+		
+		\bibitem{Augier2008}
+		A. G. Augier Calderín, R. B. Sánchez Pérez (2008),
+		\emph{Making computer-generated scratch holograms from three-dimensional virtual models},
+		Photonics Letters of Poland, Vol. 2, No. 4.
+		
+		\bibitem{Hologravure2011}
+		A. G. Augier Calderín, R. B. Sánchez Pérez, et al. (2011),
+		\emph{Hologravure as a computer-generated and laser engraved scratch hologram},
+		Optics Communications, Vol. 284, pp. 112--117.
 		
 	\end{thebibliography}
 	

@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  2 MAR 2026 00:14
+This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  2 MAR 2026 20:09
  restricted system commands enabled.
 **tesi.tex
 (./tesi.tex
@@ -494,7 +494,14 @@ File: pgflibraryarrows.meta.code.tex 2025-08-29 v3.1.11a (3.1.11a)
 Package: enumerate 2023/07/04 v3.00 enumerate extensions (DPC)
 \@enLab=\toks42
 )
-("C:/Program Files/MiKTeX/tex/latex/lm/lmodern.sty"
+("C:/Program Files/MiKTeX/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibr
+arycalc.code.tex"
+File: tikzlibrarycalc.code.tex 2025-08-29 v3.1.11a (3.1.11a)
+)
+("C:/Program Files/MiKTeX/tex/generic/pgf/frontendlayer/tikz/libraries/tikzlibr
+arypositioning.code.tex"
+File: tikzlibrarypositioning.code.tex 2025-08-29 v3.1.11a (3.1.11a)
+) ("C:/Program Files/MiKTeX/tex/latex/lm/lmodern.sty"
 Package: lmodern 2015/05/01 v1.6.1 Latin Modern Fonts
 LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'
 (Font)                  OT1/cmr/m/n --> OT1/lmr/m/n on input line 22.
@@ -959,22 +966,22 @@ TextBlockOrigin set to 0pt x 0pt
 ) (./tesi.aux)
 \openout1 = tesi.aux
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 160.
-LaTeX Font Info:    ... okay on input line 160.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 161.
+LaTeX Font Info:    ... okay on input line 161.
  ("C:/Program Files/MiKTeX/tex/context/base/mkii/supp-pdf.mkii"
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count344
@@ -1064,28 +1071,28 @@ File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 
 \c@lstlisting=\count350
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 10.95pt on input line 165.
+(Font)              scaled to size 10.95pt on input line 166.
 <LogoUniToConvertito.png, id=4, 223.83624pt x 281.05pt>
 File: LogoUniToConvertito.png Graphic file (type png)
 <use LogoUniToConvertito.png>
-Package luatex.def Info: LogoUniToConvertito.png  used on input line 168.
+Package luatex.def Info: LogoUniToConvertito.png  used on input line 169.
 (luatex.def)             Requested size: 104.42155pt x 131.11574pt.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 18.0pt on input line 173.
-LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
 (Font)              scaled to size 18.0pt on input line 174.
+LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
+(Font)              scaled to size 18.0pt on input line 175.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/it' will be
-(Font)              scaled to size 18.0pt on input line 178.
+(Font)              scaled to size 18.0pt on input line 179.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 20.0pt on input line 183.
-LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
 (Font)              scaled to size 20.0pt on input line 184.
-LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.4pt on input line 188.
-LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.0pt on input line 193.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 14.0pt on input line 197.
+(Font)              scaled to size 20.0pt on input line 185.
+LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
+(Font)              scaled to size 14.4pt on input line 189.
+LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
+(Font)              scaled to size 14.0pt on input line 194.
+LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
+(Font)              scaled to size 14.0pt on input line 198.
 [1{C:/Users/filip/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
 
 
@@ -1094,36 +1101,36 @@ LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
 
 ]
 LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 2
-47.
+48.
  ("C:/Program Files/MiKTeX/tex/latex/lm/ot1lmr.fd"
 File: ot1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OML+lmm on input line 2
-47.
+48.
 
 ("C:/Program Files/MiKTeX/tex/latex/lm/omllmm.fd"
 File: omllmm.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for U+rsfs on input line 24
-7.
+8.
 
 ("C:/Program Files/MiKTeX/tex/latex/jknappen/ursfs.fd"
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 )
-LaTeX Font Info:    Trying to load font information for U+msa on input line 247
+LaTeX Font Info:    Trying to load font information for U+msa on input line 248
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsa.fd"
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 247
+LaTeX Font Info:    Trying to load font information for U+msb on input line 248
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsb.fd"
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Trying to load font information for U+stmry on input line 2
-47.
+48.
 
 ("C:/Program Files/MiKTeX/tex/latex/stmaryrd/ustmry.fd")
 luaotfload | db : Reload initiated (formats: otf,ttf,ttc); reason: Font "stmary8
@@ -1133,7 +1140,7 @@ luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 LaTeX Font Info:    Trying to load font information for U+wasy on input line 24
-7.
+8.
 
 ("C:/Program Files/MiKTeX/tex/latex/wasysym/uwasy.fd"
 File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
@@ -1155,63 +1162,76 @@ File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
 
 ]
 Chapter 1.
+[1
 
-Underfull \vbox (badness 5711) has occurred while \output is active []
-
- [1
+] [2] [3] [4
 
 ]
-[2]
 Chapter 2.
-[3
+<fig_specular_principle.png, id=56, 1573.88pt x 674.52pt>
+File: fig_specular_principle.png Graphic file (type png)
+<use fig_specular_principle.png>
+Package luatex.def Info: fig_specular_principle.png  used on input line 304.
+(luatex.def)             Requested size: 375.80542pt x 161.05443pt.
 
-] [4
+Underfull \vbox (badness 2213) has occurred while \output is active []
 
-]
+ [5<./fig_specular_principle.png>] [6] [7] [8]
+<diagramma_proiezione.png, id=81, 1413.28pt x 770.88pt>
+File: diagramma_proiezione.png Graphic file (type png)
+<use diagramma_proiezione.png>
+Package luatex.def Info: diagramma_proiezione.png  used on input line 360.
+(luatex.def)             Requested size: 422.77661pt x 230.60707pt.
+ [9<./diagramma_proiezione.png>] [10]
 Chapter 3.
-[5] [6
+[11
+
+] [12
 
 ]
 Chapter 4.
-[7] [8
-
-]
-Chapter 5.
-[9] [10
-
-]
-Chapter 6.
-[11] [12
-
-]
-Chapter 7.
 [13] [14
 
 ]
-Chapter 8.
+Chapter 5.
 [15] [16
 
 ]
-Chapter 9.
+Chapter 6.
 [17] [18
 
 ]
-Chapter 10.
+Chapter 7.
 [19] [20
+
+]
+Chapter 8.
+[21] [22
+
+]
+Chapter 9.
+[23] [24
+
+]
+Chapter 10.
+[25] [26
 
 ]
 Chapter 11.
 
-LaTeX Warning: Reference `ps:2' on page 21 undefined on input line 382.
+LaTeX Warning: Citation `APS1' on page 27 undefined on input line 443.
 
 
-LaTeX Warning: Reference `sec:11' on page 21 undefined on input line 384.
+LaTeX Warning: Reference `ps:2' on page 27 undefined on input line 445.
 
-[21] [22
 
-] [23] [24
+LaTeX Warning: Reference `sec:11' on page 27 undefined on input line 447.
 
-] [25
+[27] [28
+
+] [29] [30
+
+] [31
 
 
 ] (./tesi.aux)
@@ -1226,23 +1246,33 @@ LaTeX Warning: There were undefined references.
 )
 
 Here is how much of LuaTeX's memory you used:
- 25305 strings out of 476076
+ 25444 strings out of 476076
  100000,953878 words of node,token memory allocated
- 559 words of node memory still in use:
-   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 14 attribute, 55 glue_spec
-, 8 attribute_list, 2 write nodes
-   avail lists: 2:968,3:301,4:130,5:384,6:73,7:9567,8:1,9:498,10:33,11:917
- 47097 multiletter control sequences out of 65536+600000
- 82 fonts using 15780711 bytes
+ 560 words of node memory still in use:
+   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 16 attribute, 54 glue_spec
+, 9 attribute_list, 2 write nodes
+   avail lists: 2:965,3:301,4:130,5:385,6:73,7:8723,8:12,9:498,10:32,11:835
+ 47218 multiletter control sequences out of 65536+600000
+ 85 fonts using 16028751 bytes
  98i,6n,104p,1466b,267s stack positions out of 10000i,1000n,20000p,200000b,200000s
-<c:/program files/miktex/fonts/opentype/public/lm/lmroman10-italic.otf><c:/progr
-am files/miktex/fonts/opentype/public/lm/lmroman10-bold.otf><c:/program files/mi
-ktex/fonts/opentype/public/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/
-opentype/public/lm/lmroman10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Window
-s/Fonts/verdanai.ttf><C:/Windows/Fonts/tahomabd.ttf>
-Output written on tesi.pdf (35 pages, 152295 bytes).
+{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKT
+eX/fonts/enc/dvips/lm/lm-rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbo
+l/MnSymbolE.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolD.enc}
+{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolC.enc}<c:/program file
+s/miktex/fonts/opentype/public/lm/lmroman10-italic.otf><c:/program files/miktex/
+fonts/opentype/public/lm/lmroman10-bold.otf><c:/program files/miktex/fonts/opent
+ype/public/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/opentype/public/
+lm/lmroman10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Windows/Fonts/verdanai
+.ttf><C:/Windows/Fonts/tahomabd.ttf><C:/Program Files/MiKTeX/fonts/type1/public/
+mnsymbol/MnSymbol10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pf
+b><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Program Files/MiK
+TeX/fonts/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public
+/lm/lmmi8.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Progr
+am Files/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/ty
+pe1/public/amsfonts/symbols/msbm10.pfb>
+Output written on tesi.pdf (41 pages, 1170867 bytes).
 
-PDF statistics: 166 PDF objects out of 1000 (max. 8388607)
+PDF statistics: 230 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 1048576)
  16 words of extra memory for PDF output out of 10000 (max. 100000000)
 
