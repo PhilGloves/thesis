@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  4 MAR 2026 10:56
+This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  4 MAR 2026 11:47
  restricted system commands enabled.
 **tesi.tex
 (./tesi.tex
@@ -1212,7 +1212,7 @@ Package hyperref Info: Link coloring OFF on input line 171.
 \openout4 = tesi.out
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
 (Font)              scaled to size 10.95pt on input line 176.
-<LogoUniToConvertito.png, id=158, 223.83624pt x 281.05pt>
+<LogoUniToConvertito.png, id=154, 223.83624pt x 281.05pt>
 File: LogoUniToConvertito.png Graphic file (type png)
 <use LogoUniToConvertito.png>
 Package luatex.def Info: LogoUniToConvertito.png  used on input line 179.
@@ -1313,7 +1313,7 @@ warning  (pdf backend): ignoring duplicate destination with the name 'page.1'
 warning  (pdf backend): ignoring duplicate destination with the name 'page.2'
 [2]
 Capitolo 2.
-<fig_specular_principle.png, id=247, 1573.88pt x 674.52pt>
+<fig_specular_principle.png, id=242, 1573.88pt x 674.52pt>
 File: fig_specular_principle.png Graphic file (type png)
 <use fig_specular_principle.png>
 Package luatex.def Info: fig_specular_principle.png  used on input line 368.
@@ -1324,7 +1324,7 @@ Package luatex.def Info: fig_specular_principle.png  used on input line 368.
 warning  (pdf backend): ignoring duplicate destination with the name 'figure.2.1
 '
 <./fig_specular_principle.png>] [4] [5] [6]
-<diagramma_proiezione.png, id=293, 1413.28pt x 770.88pt>
+<diagramma_proiezione.png, id=288, 1413.28pt x 770.88pt>
 File: diagramma_proiezione.png Graphic file (type png)
 <use diagramma_proiezione.png>
 Package luatex.def Info: diagramma_proiezione.png  used on input line 423.
@@ -1334,82 +1334,97 @@ warning  (pdf backend): ignoring duplicate destination with the name 'figure.2.2
 '
 <./diagramma_proiezione.png>] [8]
 Capitolo 3.
+<handmade1.png, id=299, 1541.76pt x 1027.84pt>
+File: handmade1.png Graphic file (type png)
+<use handmade1.png>
+Package luatex.def Info: handmade1.png  used on input line 449.
+(luatex.def)             Requested size: 258.36667pt x 172.2368pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [9
 
 ]
-<rdeits.png, id=308, 762.59906pt x 749.80125pt>
-File: rdeits.png Graphic file (type png)
-<use rdeits.png>
-Package luatex.def Info: rdeits.png  used on input line 464.
-(luatex.def)             Requested size: 211.3883pt x 207.83777pt.
-
-[10]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [11
+[10
 warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.1
 '
-<./rdeits.png>]
-Underfull \vbox (badness 1308) has occurred while \output is active []
-
- [12]
+<./handmade1.png>]
+<rdeits.png, id=310, 762.59906pt x 749.80125pt>
+File: rdeits.png Graphic file (type png)
+<use rdeits.png>
+Package luatex.def Info: rdeits.png  used on input line 470.
+(luatex.def)             Requested size: 211.3883pt x 207.83777pt.
+ [11
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.2
+'
+<./rdeits.png>] [12]
 
 LaTeX Warning: No positions in optional float specifier.
-               Default added (so using `tbp') on input line 484.
+               Default added (so using `tbp') on input line 490.
 
-<hz1.png, id=328, 1444.64719pt x 902.6222pt>
+<hz1.png, id=325, 1444.64719pt x 902.6222pt>
 File: hz1.png Graphic file (type png)
 <use hz1.png>
-Package luatex.def Info: hz1.png  used on input line 486.
+Package luatex.def Info: hz1.png  used on input line 492.
 (luatex.def)             Requested size: 446.2658pt x 278.8321pt.
 
-Underfull \hbox (badness 1803) in paragraph at lines 487--487
-[]\TU/lmr/m/n/10.95 Fi-gu-ra 3.2: []Interfaccia gra-fi-ca del pro-gram-ma \TU/l
+Underfull \hbox (badness 1803) in paragraph at lines 493--493
+[]\TU/lmr/m/n/10.95 Fi-gu-ra 3.3: []Interfaccia gra-fi-ca del pro-gram-ma \TU/l
 mtt/m/n/10.95 HoloZens \TU/lmr/m/n/10.95 ([]$\TU/lmtt/m/n/10.95 https://github.c
 om/aaronse/
  []
 
 [13
-warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.2
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.3
 '
 <./hz1.png>]
-<hz2.png, id=340, 1863.21094pt x 754.31813pt>
+<hz2.png, id=337, 1863.21094pt x 754.31813pt>
 File: hz2.png Graphic file (type png)
 <use hz2.png>
-Package luatex.def Info: hz2.png  used on input line 500.
+Package luatex.def Info: hz2.png  used on input line 506.
 (luatex.def)             Requested size: 493.24417pt x 199.68617pt.
 
-Overfull \hbox (23.48918pt too wide) in paragraph at lines 500--501
+Overfull \hbox (23.48918pt too wide) in paragraph at lines 506--507
  [][] 
  []
 
-[14
-warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.3
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [14]
+[15
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.4
 '
-<./hz2.png>] [15] [16] [17] [18
+<./hz2.png>] [16] [17] [18
 
 ]
 Capitolo 4.
-[19] [20
-
-]
+[19] [20] [21] [22] [23]
+<pipeline_schema1.png, id=388, 1381.16pt x 299.1175pt>
+File: pipeline_schema1.png Graphic file (type png)
+<use pipeline_schema1.png>
+Package luatex.def Info: pipeline_schema1.png  used on input line 626.
+(luatex.def)             Requested size: 469.75499pt x 101.73055pt.
+ [24
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.4.1
+'
+<./pipeline_schema1.png>]
 Capitolo 5.
-[21] [22
+[25
+
+] [26
 
 ]
 Capitolo 6.
-[23] [24
+[27] [28
 
 ]
 Capitolo 7.
-[25] [26
+[29] [30
 
-] [27] [28
+] [31] [32
 
-] [29
+] [33
 
 
 ] (./tesi.aux)
@@ -1417,48 +1432,40 @@ Capitolo 7.
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
-
-
-Package rerunfilecheck Warning: File `tesi.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `tesi.out':
-(rerunfilecheck)             Before: 58132E5B8D370B59FB92DE01C5F6C5AB;8572
-(rerunfilecheck)             After:  E963951534EE7F440987F1291F53C398;8338.
+Package rerunfilecheck Info: File `tesi.out' has not changed.
+(rerunfilecheck)             Checksum: E963951534EE7F440987F1291F53C398;8338.
 )
 
 Here is how much of LuaTeX's memory you used:
- 32668 strings out of 476076
+ 32700 strings out of 476076
  125007,1144653 words of node,token memory allocated
- 604 words of node memory still in use:
-   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 20 attribute, 58 glue_spec
-, 11 attribute_list, 2 write, 2 pdf_action nodes
-   avail lists: 2:887,3:285,4:92,5:499,6:81,7:11955,8:46,9:434,10:43,11:2002
- 54229 multiletter control sequences out of 65536+600000
+ 622 words of node memory still in use:
+   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 26 attribute, 58 glue_spec
+, 14 attribute_list, 2 write, 2 pdf_action nodes
+   avail lists: 2:878,3:285,4:92,5:453,6:81,7:11682,8:46,9:434,10:43,11:2001
+ 54250 multiletter control sequences out of 65536+600000
  84 fonts using 15891463 bytes
- 98i,6n,104p,1466b,514s stack positions out of 10000i,1000n,20000p,200000b,200000s
-
-warning  (pdf backend): unreferenced destination with name 'section.3.4'
-<c:/program files/miktex/fonts/opentype/public/lm/lmmono10-regular.otf>{C:/Progr
-am Files/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKTeX/fonts/
-enc/dvips/lm/lm-rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbo
-lE.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolD.enc}{C:/Progr
-am Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolC.enc}<c:/program files/miktex/
+ 98i,7n,104p,1466b,514s stack positions out of 10000i,1000n,20000p,200000b,200000s
+{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolC.enc}<c:/program file
+s/miktex/fonts/opentype/public/lm/lmmono10-regular.otf>{C:/Program Files/MiKTeX/
+fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-
+rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolE.enc}{C:/Progr
+am Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolD.enc}<c:/program files/miktex/
 fonts/opentype/public/lm/lmroman10-italic.otf><c:/program files/miktex/fonts/ope
 ntype/public/lm/lmroman10-bold.otf><c:/program files/miktex/fonts/opentype/publi
 c/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/opentype/public/lm/lmroma
 n10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Windows/Fonts/verdanai.ttf><C:/
 Windows/Fonts/tahomabd.ttf><C:/Program Files/MiKTeX/fonts/type1/public/mnsymbol/
-MnSymbol10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Pro
-gram Files/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Program Files/MiKTeX/fonts
-/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi8
-.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Program Files/
-MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/type1/publi
-c/amsfonts/symbols/msbm10.pfb>
-Output written on tesi.pdf (37 pages, 3563807 bytes).
+MnSymbol10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/mnsymbol/MnSymbol8.pf
+b><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Program Files/Mi
+KTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Program Files/MiKTeX/fonts/type1/public
+/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Prog
+ram Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Program Files/MiKTeX/fonts/
+type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/sy
+mbols/msbm10.pfb>
+Output written on tesi.pdf (41 pages, 4107683 bytes).
 
-PDF statistics: 496 PDF objects out of 1000 (max. 8388607)
- 85 named destinations out of 1000 (max. 1048576)
- 320 words of extra memory for PDF output out of 10000 (max. 100000000)
+PDF statistics: 523 PDF objects out of 1000 (max. 8388607)
+ 92 named destinations out of 1000 (max. 1048576)
+ 312 words of extra memory for PDF output out of 10000 (max. 100000000)
 

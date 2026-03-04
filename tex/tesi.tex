@@ -441,10 +441,16 @@ ItalicFont={Verdana Italic},
 	
 	Gli scratch hologram nascono in ambito prevalentemente sperimentale e artistico, prima ancora che computazionale. La realizzazione manuale consiste nell’incidere archi o curve su una superficie riflettente, tipicamente plastica o metallo lucidato, in modo tale che la luce venga riflessa verso l’osservatore secondo traiettorie controllate. L’effetto tridimensionale emerge dalla disposizione coerente di tali incisioni: ciascuna curva produce un riflesso che, al variare della posizione dell’occhio, sembra muoversi lungo una traiettoria nello spazio percepito. L’insieme dei riflessi genera l’impressione di una struttura volumetrica sospesa dietro o davanti al piano inciso.
 	Nella pratica manuale, la costruzione degli archi avviene spesso utilizzando un compasso o guide circolari, partendo da una configurazione geometrica intuitiva. L’autore sceglie una posizione di osservazione di riferimento e realizza incisioni con raggi e centri opportunamente determinati in modo empirico. Il risultato non deriva da una formalizzazione matematica esplicita, ma da un adattamento progressivo tra configurazione di vista e risposta visiva. Questo approccio, pur non essendo rigoroso dal punto di vista teorico, consente di ottenere effetti percettivamente convincenti con mezzi semplici.
-	
 	Dal punto di vista strutturale, gli scratch hologram manuali possono essere interpretati come un’approssimazione discreta di una superficie speculare ideale. Invece di modellare una superficie continua con normale variabile, si utilizzano incisioni isolate che producono riflessi localizzati. L’illusione tridimensionale è efficace entro un intervallo limitato di angoli di osservazione e tende a degradare al di fuori della configurazione per cui le incisioni sono state progettate. Questo comportamento mette in evidenza la natura fortemente direzionale della tecnica.
 	Ai fini della presente tesi, lo studio degli approcci manuali è rilevante perché consente di comprendere quali elementi geometrici siano responsabili dell’effetto percepito. L’uso di archi circolari, la scelta di un piano riflettente e la dipendenza dalla configurazione di vista costituiscono principi che vengono successivamente formalizzati e tradotti in una pipeline computazionale. L’obiettivo non è replicare la pratica artistica, ma astrarne i meccanismi geometrici fondamentali per renderli trattabili in modo sistematico.
 
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.55\textwidth]{handmade1.png}
+		\caption[Costruzione manuale di uno scratch hologram]{Schema illustrativo della costruzione manuale di uno scratch hologram mediante incisione di archi su una superficie riflettente. Gli archi possono essere tracciati con strumenti semplici, come un compasso modificato con punta incisoria.}
+		\label{fig:handhologram}
+	\end{figure}
+	
 	
 	\section{Strumenti software esistenti}
 	
@@ -536,11 +542,91 @@ ItalicFont={Verdana Italic},
 	\chapter{Formalizzazione e progettazione della pipeline}
 	
 	\section{Rappresentazione della mesh triangolare}
+	
+	I modelli tridimensionali utilizzati come input della pipeline sono rappresentati tramite mesh triangolari. Una mesh triangolare è una struttura geometrica discreta che approssima la superficie di un oggetto tridimensionale mediante un insieme finito di triangoli connessi tra loro. Questa rappresentazione è largamente utilizzata nei sistemi di modellazione geometrica, nella grafica computazionale e nei processi di fabbricazione digitale, poiché consente di descrivere superfici complesse attraverso una struttura relativamente semplice e facilmente manipolabile \cite{Botsch2010}.
+	Formalmente, una mesh triangolare può essere descritta come una coppia \(M = (V, F)\), dove \(V = \{v_1, v_2, \dots, v_n\}\) rappresenta l’insieme dei vertici della mesh e \(F = \{f_1, f_2, \dots, f_m\}\) rappresenta l’insieme delle facce triangolari. Ogni vertice \(v_i\) è definito da una posizione nello spazio tridimensionale, generalmente espressa come vettore \(v_i = (x_i, y_i, z_i) \in \mathbb{R}^3\). Ogni faccia triangolare \(f_j\) è invece definita da una tripla ordinata di vertici della mesh, che identificano i tre punti che compongono il triangolo.
+	A partire dall’insieme delle facce è possibile derivare anche l’insieme degli spigoli della mesh. Uno spigolo è definito come il segmento che collega due vertici appartenenti alla stessa faccia. Nella maggior parte delle mesh triangolari utilizzate nella pratica, ogni spigolo è condiviso da due facce adiacenti, mentre gli spigoli appartenenti al bordo della mesh possono essere associati a una sola faccia.
+
+	Nel contesto di questa tesi, i modelli tridimensionali sono forniti in formato STL (Stereolithography), uno dei formati più diffusi nei flussi di fabbricazione digitale. In questo formato la superficie dell’oggetto è descritta esplicitamente come una lista di triangoli indipendenti, ciascuno definito dalle coordinate dei suoi tre vertici e da una normale associata alla faccia. Il formato STL non memorizza esplicitamente la connettività tra i triangoli; di conseguenza, durante il caricamento del modello è necessario ricostruire le relazioni tra vertici, facce e spigoli a partire dai dati geometrici contenuti nel file.	
+	Una volta ricostruita la struttura della mesh, essa può essere utilizzata come base per le successive operazioni geometriche della pipeline. In particolare, gli spigoli della mesh costituiscono gli elementi principali su cui viene effettuato il campionamento dei punti che daranno origine alle traiettorie di incisione. Per questo motivo, una rappresentazione coerente della struttura della mesh è un passaggio fondamentale per le fasi successive del processo computazionale.
+	
 	\section{Estrazione e selezione degli spigoli}
+	
+	Una volta caricata la mesh triangolare dal file STL, la pipeline procede con l’estrazione degli spigoli della superficie. Come discusso nella sezione precedente, il formato STL descrive l’oggetto esclusivamente come una lista di triangoli indipendenti, senza memorizzare esplicitamente le relazioni di adiacenza tra le facce. Di conseguenza, gli spigoli non sono presenti come entità esplicite nel file, ma devono essere ricostruiti a partire dai vertici che compongono ciascun triangolo.
+	Sia \(f = (v_i, v_j, v_k)\) una faccia triangolare della mesh. Da essa è possibile derivare tre spigoli distinti, corrispondenti alle coppie di vertici \((v_i, v_j)\), \((v_j, v_k)\) e \((v_k, v_i)\). Applicando questa operazione a tutte le facce della mesh si ottiene un insieme iniziale di spigoli candidati. Tuttavia, poiché le facce adiacenti condividono gli stessi vertici, molti di questi spigoli risultano duplicati. Per ottenere una rappresentazione coerente della struttura della mesh è quindi necessario individuare e unificare gli spigoli geometricamente equivalenti.
+	
+	Nella pipeline implementata in questo lavoro, gli spigoli vengono rappresentati come coppie ordinate di vertici nello spazio tridimensionale. Durante la fase di costruzione della struttura dati, gli spigoli derivati dalle facce vengono inseriti in una struttura di raccolta che consente di eliminare automaticamente i duplicati. In questo modo ogni spigolo della mesh viene rappresentato una sola volta, indipendentemente dal numero di facce che lo condividono.
+	Una volta ottenuto l’insieme degli spigoli unici della mesh, è possibile applicare criteri di selezione per individuare quelli rilevanti ai fini della generazione del pattern. Nel contesto degli scratch hologram, gli spigoli rappresentano punti di discontinuità geometrica nella superficie e costituiscono una sorgente informativa particolarmente efficace per suggerire la forma tridimensionale dell’oggetto. Per questo motivo, la pipeline utilizza gli spigoli della mesh come elementi di base per il campionamento dei punti che daranno origine alle traiettorie di incisione.
+	In termini operativi, ogni spigolo viene considerato come un segmento nello spazio tridimensionale definito dai suoi due vertici estremi. Su ciascun segmento viene successivamente applicata una procedura di campionamento che genera una sequenza discreta di punti distribuiti lungo la lunghezza dello spigolo. Questi punti costituiscono l’input per le fasi successive della pipeline, in cui la loro posizione viene trasformata nello spazio di vista e utilizzata per la costruzione degli archi nel piano di incisione.
+	
+	
 	\section{Modello matematico per la generazione degli archi}
+	
+	Una volta individuati gli spigoli della mesh e generati i punti campionati lungo di essi, la pipeline deve trasformare tali punti tridimensionali in traiettorie bidimensionali sul piano di incisione. Nel contesto degli scratch hologram, ogni punto della geometria tridimensionale non viene rappresentato direttamente nel piano, ma attraverso una micro–incisione orientata in modo tale da produrre un riflesso luminoso percepibile dall’osservatore. La costruzione delle traiettorie di incisione richiede quindi un modello geometrico che colleghi la posizione del punto nello spazio alla forma dell’incisione sul piano.
+	Sia \(p \in \mathbb{R}^3\) un punto appartenente alla superficie del modello tridimensionale, ottenuto tramite campionamento di uno spigolo della mesh. Si consideri inoltre una configurazione di osservazione definita da una posizione della camera \(p_o\) e da una direzione di osservazione orientata verso il modello. La pipeline applica una trasformazione di vista che proietta il punto tridimensionale nello spazio immagine, ottenendo una coordinata bidimensionale \((x, y)\) e una profondità associata.
+	Nel modello adottato in questa tesi, la traiettoria di incisione associata a ciascun punto campionato è rappresentata da un arco circolare nel piano di incisione. L’arco può essere descritto come una porzione di circonferenza definita da un centro \(c = (c_x, c_y)\), da un raggio \(r\) e da un intervallo angolare \([\theta_1, \theta_2]\). In forma parametrica, i punti dell’arco possono essere espressi come
+	
+	\[
+	\gamma(\theta) =
+	\begin{pmatrix}
+		c_x + r \cos\theta \\
+		c_y + r \sin\theta
+	\end{pmatrix},
+	\quad \theta \in [\theta_1, \theta_2].
+	\]
+	
+	L’utilizzo di archi circolari è coerente con le modalità operative delle macchine CNC, che supportano direttamente movimenti di interpolazione circolare tramite comandi G-code di tipo G2 e G3. In questo modo le traiettorie generate possono essere rappresentate in maniera compatta e trasformate facilmente in istruzioni macchina.
+	Nel contesto della pipeline, il centro e il raggio dell’arco vengono determinati a partire dalla posizione del punto proiettato e da parametri globali che controllano la scala e la curvatura delle incisioni. L’intervallo angolare dell’arco rappresenta invece la porzione di traiettoria effettivamente incisa e può essere limitato per evitare sovrapposizioni o per mantenere una densità controllata delle incisioni nel piano.
+	Questo modello non intende descrivere in modo completo il comportamento fisico della riflessione luminosa sulla superficie incisa, ma costituisce una semplificazione geometrica che consente di generare pattern coerenti e computazionalmente efficienti. L’obiettivo è produrre una distribuzione di archi nel piano tale che, osservata da una configurazione di vista appropriata, suggerisca la struttura tridimensionale del modello di partenza.
+	
 	\section{Proiezione e trasformazioni di coordinate}
+	
+	Per poter generare traiettorie di incisione nel piano bidimensionale è necessario trasformare i punti della mesh tridimensionale nello spazio di vista della camera e successivamente nello spazio immagine. Questa trasformazione consente di stabilire una corrispondenza tra la geometria del modello e la posizione delle incisioni sul piano riflettente.
+	Si consideri un punto del modello tridimensionale \(p \in \mathbb{R}^3\). La configurazione di osservazione è definita da due elementi principali: la posizione dell’osservatore \(p_o\) e un punto di riferimento \(p_r\) verso cui la camera è orientata. A partire da queste due grandezze è possibile costruire un sistema di riferimento locale associato alla camera, che definisce lo spazio di vista.
+	
+	Il primo passo consiste nel determinare la direzione di osservazione
+	
+	\[
+	\mathbf{w} = \frac{p_o - p_r}{\|p_o - p_r\|}
+	\]
+	
+	che rappresenta l’asse della camera orientato dall’oggetto verso l’osservatore. A partire da questo vettore è possibile costruire una base ortonormale dello spazio di vista introducendo due ulteriori vettori ortogonali tra loro e a \(\mathbf{w}\). In particolare, si definiscono i vettori \(\mathbf{u}\) e \(\mathbf{v}\) che rappresentano rispettivamente l’asse orizzontale e l’asse verticale del piano immagine.
+	Una volta costruita la base \((\mathbf{u}, \mathbf{v}, \mathbf{w})\), ogni punto tridimensionale \(p\) può essere espresso nel sistema di riferimento della camera tramite una trasformazione lineare. Se \(p' = p - p_r\) rappresenta il punto traslato rispetto al riferimento della scena, le coordinate nel sistema di vista possono essere ottenute tramite il prodotto scalare con i vettori della base:
+	
+	\[
+	x_v = p' \cdot \mathbf{u}, \qquad
+	y_v = p' \cdot \mathbf{v}, \qquad
+	z_v = p' \cdot \mathbf{w}.
+	\]
+	
+	Le coordinate \((x_v, y_v)\) rappresentano la posizione del punto nel piano di proiezione, mentre \(z_v\) descrive la profondità relativa rispetto alla camera. Nel contesto della pipeline, la proiezione utilizzata è di tipo ortografico, poiché l’obiettivo principale è stabilire una corrispondenza stabile tra i punti del modello e le posizioni delle incisioni nel piano. In una proiezione ortografica, le coordinate nel piano immagine coincidono direttamente con \((x_v, y_v)\), mentre la profondità \(z_v\) viene mantenuta come informazione ausiliaria per le successive operazioni di visibilità.
+	Il risultato di questa trasformazione è quindi un insieme di punti nel piano bidimensionale associati a valori di profondità. Tali punti costituiscono la base per le fasi successive della pipeline, in cui vengono generate le traiettorie di incisione e viene valutata la visibilità delle geometrie rispetto alla configurazione di osservazione.
+
 	\section{Visibilità e gestione dell’occlusione}
+	
+	Una volta proiettati i punti della mesh nello spazio di vista, è necessario determinare quali elementi della geometria risultano effettivamente visibili dalla configurazione di osservazione scelta. Nei modelli tridimensionali complessi, infatti, alcune parti della superficie possono risultare occluse da altre regioni della stessa mesh. Se tali elementi venissero comunque utilizzati per generare traiettorie di incisione, il pattern risultante potrebbe contenere informazioni geometriche incoerenti con la forma percepita dell’oggetto.
+	Il problema della visibilità è ben noto nella grafica computazionale ed è generalmente affrontato attraverso tecniche di \emph{hidden surface removal}, che permettono di individuare le parti della scena effettivamente visibili dalla camera \cite{Foley1996}. Nel contesto della pipeline descritta in questa tesi, il problema assume una forma leggermente diversa: non si tratta di determinare la visibilità di intere superfici, ma di valutare se i punti campionati sugli spigoli della mesh siano visibili oppure nascosti rispetto ad altre parti della geometria.
+	Per affrontare questo problema, la pipeline utilizza una rappresentazione della profondità associata alla proiezione della scena. Come discusso nella sezione precedente, ogni punto proiettato nel piano immagine è associato a una coordinata di profondità \(z_v\), che indica la distanza relativa del punto rispetto alla camera. A partire da questa informazione è possibile costruire una struttura di dati che memorizza, per ogni posizione del piano immagine discretizzato, la profondità minima osservata lungo la direzione di vista.
+	Questa struttura, comunemente nota come \emph{Z-buffer}, consente di confrontare la profondità di un punto con quella degli altri elementi della scena proiettati nella stessa regione del piano immagine. Se la profondità del punto campionato risulta maggiore rispetto alla profondità minima registrata nel buffer, ciò indica che il punto è nascosto da una superficie più vicina alla camera e può quindi essere considerato non visibile.
+	Nel contesto degli scratch hologram, l’obiettivo non è eliminare completamente tutte le parti nascoste della geometria, ma evitare che incisioni generate da punti completamente occlusi contribuiscano al pattern finale. Per questo motivo la pipeline adotta una strategia conservativa nella valutazione della visibilità, in modo da preservare i punti che si trovano in prossimità dei contorni visibili della geometria. Questo approccio consente di mantenere informazioni utili per la percezione della forma tridimensionale senza introdurre artefatti dovuti alla presenza di elementi completamente nascosti.
+	Il risultato di questa fase è quindi un sottoinsieme dei punti campionati sugli spigoli della mesh che risultano visibili dalla configurazione di osservazione scelta. Solo questi punti vengono utilizzati nelle fasi successive della pipeline per la generazione delle traiettorie di incisione.
+	
 	\section{Architettura generale della pipeline}
+	
+	Le sezioni precedenti hanno introdotto gli elementi geometrici fondamentali utilizzati nella generazione degli scratch hologram: la rappresentazione della mesh triangolare, l’estrazione degli spigoli, il campionamento dei punti lungo tali spigoli, la proiezione nello spazio di vista e la valutazione della visibilità rispetto alla configurazione di osservazione. Questi passaggi possono essere organizzati in una pipeline computazionale che trasforma progressivamente la rappresentazione tridimensionale del modello in un insieme di traiettorie bidimensionali utilizzabili per l’incisione.
+	La pipeline sviluppata in questo lavoro accetta come input un modello tridimensionale in formato STL e produce come output un insieme di archi nel piano bidimensionale, esportabili in formati vettoriali o utilizzabili per la generazione di codice macchina. L’intero processo è organizzato come una sequenza di trasformazioni geometriche applicate alla mesh e ai punti campionati sugli spigoli.
+	La prima fase consiste nel caricamento e nel preprocessing del modello tridimensionale. Il file STL viene analizzato per ricostruire la struttura della mesh, identificando vertici, facce e spigoli. A partire da questa rappresentazione vengono individuati gli spigoli unici della mesh, che costituiscono gli elementi di base per la generazione del pattern.
+	Nella seconda fase viene effettuato il campionamento dei punti lungo gli spigoli. Ogni spigolo della mesh viene trattato come un segmento nello spazio tridimensionale e viene discretizzato generando una sequenza di punti equidistanti. Questi punti rappresentano i campioni della geometria tridimensionale che verranno successivamente trasformati nello spazio di vista.
+	La terza fase consiste nella trasformazione dei punti campionati nel sistema di riferimento della camera e nella loro proiezione nel piano bidimensionale. Attraverso la trasformazione di vista descritta nella sezione precedente, ogni punto tridimensionale viene associato a una posizione nel piano immagine e a una coordinata di profondità.
+	Successivamente viene eseguita la valutazione della visibilità. Utilizzando l’informazione di profondità derivata dalla proiezione, la pipeline identifica i punti che risultano occlusi da altre parti della geometria e filtra quelli che non contribuiscono alla percezione della forma del modello.
+	Infine, i punti visibili vengono utilizzati per generare le traiettorie di incisione. A ciascun punto campionato viene associato un arco nel piano bidimensionale, definito da parametri geometrici che controllano posizione, raggio e intervallo angolare della traiettoria. L’insieme degli archi così generato costituisce il pattern finale dello scratch hologram, che può essere esportato in formato vettoriale oppure utilizzato come base per la generazione di G-code.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=1\textwidth]{pipeline_schema1.png}
+		\caption[Schema generale della pipeline]{Schema concettuale della pipeline computazionale utilizzata per la generazione di scratch hologram a partire da un modello tridimensionale.}
+		\label{fig:pipeline}
+	\end{figure}
 	
 	
 	\chapter{Implementazione e generazione del G-code}
@@ -595,6 +681,16 @@ ItalicFont={Verdana Italic},
 		A. G. Augier Calderín, R. B. Sánchez Pérez, et al. (2011),
 		\emph{Hologravure as a computer-generated and laser engraved scratch hologram},
 		Optics Communications, Vol. 284, pp. 112--117.
+		
+		\bibitem{Botsch2010}
+		M. Botsch, L. Kobbelt, M. Pauly, P. Alliez, B. Lévy (2010),
+		\emph{Polygon Mesh Processing},
+		AK Peters / CRC Press.
+		
+		\bibitem{Foley1996}
+		J. D. Foley, A. van Dam, S. K. Feiner, J. F. Hughes (1996),
+		\emph{Computer Graphics: Principles and Practice},
+		Addison-Wesley.
 		
 	\end{thebibliography}
 	
