@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  2 MAR 2026 20:09
+This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  4 MAR 2026 10:56
  restricted system commands enabled.
 **tesi.tex
 (./tesi.tex
@@ -655,19 +655,24 @@ Package babel Info: Configuration files are deprecated, as
 File: bblopts.cfg 2005/09/08 v0.1 add Arabic and Farsi to "declared" options of
  babel
 )
-("C:/Program Files/MiKTeX/tex/generic/babel/locale/en/babel-english.tex")
-Package babel Info: Importing font and identification data for english
-(babel)             from babel-en.ini. Reported on input line 4330.
+("C:/Program Files/MiKTeX/tex/generic/babel/locale/it/babel-italian.tex")
+Package babel Info: Importing font and identification data for italian
+(babel)             from babel-it.ini. Reported on input line 4330.
 
-("C:/Program Files/MiKTeX/tex/latex/babel-english/english.ldf"
-Language: english 2017/06/06 v3.3r English support from the babel system
-Package babel Info: Hyphen rules for 'canadian' set to \l@english
-(babel)             (\language0). Reported on input line 102.
-Package babel Info: Hyphen rules for 'australian' set to \l@ukenglish
-(babel)             (\language74). Reported on input line 105.
-Package babel Info: Hyphen rules for 'newzealand' set to \l@ukenglish
-(babel)             (\language74). Reported on input line 108.
-))
+("C:/Program Files/MiKTeX/tex/latex/babel-italian/italian.ldf"
+Language: italian 2026/01/13 v.1.5.02 Italian support for the babel system
+\it@lettering=\count316
+\it@doublequoteactive=\count317
+\it@ISOcompliance=\count318
+
+("C:/Program Files/MiKTeX/tex/generic/hyph-utf8/loadhyph/loadhyph-it.tex"
+UTF-8 Italian hyphenation patterns
+("C:/Program Files/MiKTeX/tex/generic/hyph-utf8/patterns/tex/hyph-it.tex")
+("C:/Program Files/MiKTeX/tex/generic/hyph-utf8/patterns/quote/hyph-quote-it.te
+x")))) ("C:/Program Files/MiKTeX/tex/latex/etoolbox/etoolbox.sty"
+Package: etoolbox 2025/10/02 v2.5m e-TeX tools for LaTeX (JAW)
+\etb@tempcnta=\count319
+)
 ("C:/Program Files/MiKTeX/tex/latex/geometry/geometry.sty"
 Package: geometry 2020/01/02 v5.9 Page Geometry
 
@@ -677,9 +682,9 @@ Package: ifvtex 2019/10/25 v1.7 ifvtex legacy package. Use iftex instead.
 ("C:/Program Files/MiKTeX/tex/generic/iftex/iftex.sty"
 Package: iftex 2024/12/12 v1.0g TeX engine tests
 ))
-\Gm@cnth=\count316
-\Gm@cntv=\count317
-\c@Gm@tempcnt=\count318
+\Gm@cnth=\count320
+\Gm@cntv=\count321
+\c@Gm@tempcnt=\count322
 \Gm@bindingoffset=\dimen274
 \Gm@wd@mp=\dimen275
 \Gm@odd@mp=\dimen276
@@ -703,26 +708,26 @@ Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
 \cmidrulesep=\dimen289
 \cmidrulekern=\dimen290
 \defaultaddspace=\dimen291
-\@cmidla=\count319
-\@cmidlb=\count320
+\@cmidla=\count323
+\@cmidlb=\count324
 \@aboverulesep=\dimen292
 \@belowrulesep=\dimen293
-\@thisruleclass=\count321
-\@lastruleclass=\count322
+\@thisruleclass=\count325
+\@lastruleclass=\count326
 \@thisrulewidth=\dimen294
 )
 ("C:/Program Files/MiKTeX/tex/latex/listings/listings.sty"
-\lst@mode=\count323
+\lst@mode=\count327
 \lst@gtempboxa=\box68
 \lst@token=\toks44
-\lst@length=\count324
+\lst@length=\count328
 \lst@currlwidth=\dimen295
-\lst@column=\count325
-\lst@pos=\count326
+\lst@column=\count329
+\lst@pos=\count330
 \lst@lostspace=\dimen296
 \lst@width=\dimen297
-\lst@newlines=\count327
-\lst@lineno=\count328
+\lst@newlines=\count331
+\lst@lineno=\count332
 \lst@maxwidth=\dimen298
 
 ("C:/Program Files/MiKTeX/tex/latex/listings/lstpatch.sty"
@@ -730,8 +735,8 @@ File: lstpatch.sty 2025/11/14 1.11b (Carsten Heinz)
 )
 ("C:/Program Files/MiKTeX/tex/latex/listings/lstmisc.sty"
 File: lstmisc.sty 2025/11/14 1.11b (Carsten Heinz)
-\c@lstnumber=\count329
-\lst@skipnumbers=\count330
+\c@lstnumber=\count333
+\lst@skipnumbers=\count334
 \lst@framebox=\box69
 )
 ("C:/Program Files/MiKTeX/tex/latex/listings/listings.cfg"
@@ -749,8 +754,137 @@ Package: listings 2025/11/14 1.11b (Carsten Heinz)
 Package: emptypage 2010/05/30 v1.2 Suppress page numbers and headings on empty 
 pages
 )
+("C:/Program Files/MiKTeX/tex/latex/hyperref/hyperref.sty"
+Package: hyperref 2026-01-29 v7.01p Hypertext links for LaTeX
+
+("C:/Program Files/MiKTeX/tex/latex/kvsetkeys/kvsetkeys.sty"
+Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
+)
+("C:/Program Files/MiKTeX/tex/generic/kvdefinekeys/kvdefinekeys.sty"
+Package: kvdefinekeys 2019-12-19 v1.6 Define keys (HO)
+)
+("C:/Program Files/MiKTeX/tex/generic/pdfescape/pdfescape.sty"
+Package: pdfescape 2019/12/09 v1.15 Implements pdfTeX's escape features (HO)
+
+("C:/Program Files/MiKTeX/tex/generic/ltxcmds/ltxcmds.sty"
+Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
+)
+("C:/Program Files/MiKTeX/tex/generic/pdftexcmds/pdftexcmds.sty"
+Package: pdftexcmds 2020-06-27 v0.33 Utility functions of pdfTeX for LuaTeX (HO
+)
+
+("C:/Program Files/MiKTeX/tex/generic/infwarerr/infwarerr.sty"
+Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)
+)
+Package pdftexcmds Info: \pdf@primitive is available.
+Package pdftexcmds Info: \pdf@ifprimitive is available.
+Package pdftexcmds Info: \pdfdraftmode found.
+\pdftexcmds@toks=\toks45
+))
+("C:/Program Files/MiKTeX/tex/latex/hycolor/hycolor.sty"
+Package: hycolor 2020-01-27 v1.10 Color options for hyperref/bookmark (HO)
+)
+("C:/Program Files/MiKTeX/tex/latex/hyperref/nameref.sty"
+Package: nameref 2026-01-29 v2.58 Cross-referencing by name of section
+
+("C:/Program Files/MiKTeX/tex/latex/refcount/refcount.sty"
+Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
+)
+("C:/Program Files/MiKTeX/tex/generic/gettitlestring/gettitlestring.sty"
+Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
+
+("C:/Program Files/MiKTeX/tex/latex/kvoptions/kvoptions.sty"
+Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
+))
+\c@section@level=\count335
+)
+("C:/Program Files/MiKTeX/tex/generic/stringenc/stringenc.sty"
+Package: stringenc 2019/11/29 v1.12 Convert strings between diff. encodings (HO
+)
+)
+\@linkdim=\dimen299
+\Hy@linkcounter=\count336
+\Hy@pagecounter=\count337
+
+("C:/Program Files/MiKTeX/tex/latex/hyperref/pd1enc.def"
+File: pd1enc.def 2026-01-29 v7.01p Hyperref: PDFDocEncoding definition (HO)
+)
+("C:/Program Files/MiKTeX/tex/generic/intcalc/intcalc.sty"
+Package: intcalc 2019/12/15 v1.3 Expandable calculations with integers (HO)
+)
+\Hy@SavedSpaceFactor=\count338
+
+("C:/Program Files/MiKTeX/tex/latex/hyperref/puenc.def"
+File: puenc.def 2026-01-29 v7.01p Hyperref: PDF Unicode definition (HO)
+)
+Package hyperref Info: Hyper figures OFF on input line 4201.
+Package hyperref Info: Link nesting OFF on input line 4206.
+Package hyperref Info: Hyper index ON on input line 4209.
+Package hyperref Info: Plain pages OFF on input line 4216.
+Package hyperref Info: Backreferencing OFF on input line 4221.
+Package hyperref Info: Implicit mode ON; LaTeX internals redefined.
+Package hyperref Info: Bookmarks ON on input line 4468.
+\c@Hy@tempcnt=\count339
+
+("C:/Program Files/MiKTeX/tex/latex/url/url.sty"
+\Urlmuskip=\muskip18
+Package: url 2013/09/16  ver 3.4  Verb mode for urls, etc.
+)
+LaTeX Info: Redefining \url on input line 4807.
+\XeTeXLinkMargin=\dimen300
+
+("C:/Program Files/MiKTeX/tex/generic/bitset/bitset.sty"
+Package: bitset 2019/12/09 v1.3 Handle bit-vector datatype (HO)
+
+("C:/Program Files/MiKTeX/tex/generic/bigintcalc/bigintcalc.sty"
+Package: bigintcalc 2019/12/15 v1.5 Expandable calculations on big integers (HO
+)
+))
+\Fld@menulength=\count340
+\Field@Width=\dimen301
+\Fld@charsize=\dimen302
+Package hyperref Info: Hyper figures OFF on input line 6084.
+Package hyperref Info: Link nesting OFF on input line 6089.
+Package hyperref Info: Hyper index ON on input line 6092.
+Package hyperref Info: backreferencing OFF on input line 6099.
+Package hyperref Info: Link coloring OFF on input line 6104.
+Package hyperref Info: Link coloring with OCG OFF on input line 6109.
+Package hyperref Info: PDF/A mode OFF on input line 6114.
+\Hy@abspage=\count341
+\c@Item=\count342
+\c@Hfootnote=\count343
+)
+Package hyperref Info: Driver (autodetected): hluatex.
+
+("C:/Program Files/MiKTeX/tex/latex/hyperref/hluatex.def"
+File: hluatex.def 2026-01-29 v7.01p Hyperref driver for luaTeX
+\Fld@listcount=\count344
+\c@bookmark@seq@number=\count345
+
+("C:/Program Files/MiKTeX/tex/latex/rerunfilecheck/rerunfilecheck.sty"
+Package: rerunfilecheck 2025-06-21 v1.11 Rerun checks for auxiliary files (HO)
+
+("C:/Program Files/MiKTeX/tex/generic/uniquecounter/uniquecounter.sty"
+Package: uniquecounter 2019/12/15 v1.4 Provide unlimited unique counter (HO)
+)
+Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
+84.
+)
+\Hy@SectionHShift=\skip59
+)
 ("C:/Program Files/MiKTeX/tex/latex/cleveref/cleveref.sty"
 Package: cleveref 2018/03/27 v0.21.4 Intelligent cross-referencing
+Package cleveref Info: `hyperref' support loaded on input line 2370.
+LaTeX Info: Redefining \cref on input line 2370.
+LaTeX Info: Redefining \Cref on input line 2370.
+LaTeX Info: Redefining \crefrange on input line 2370.
+LaTeX Info: Redefining \Crefrange on input line 2370.
+LaTeX Info: Redefining \cpageref on input line 2370.
+LaTeX Info: Redefining \Cpageref on input line 2370.
+LaTeX Info: Redefining \cpagerefrange on input line 2370.
+LaTeX Info: Redefining \Cpagerefrange on input line 2370.
+LaTeX Info: Redefining \labelcref on input line 2370.
+LaTeX Info: Redefining \labelcpageref on input line 2370.
 Package cleveref Info: `amsthm' support loaded on input line 3026.
 Package cleveref Info: `listings' support loaded on input line 3131.
 )
@@ -839,10 +973,30 @@ LaTeX Font Info:    Redeclaring math accent \widehat on input line 1845.
 LaTeX Font Info:    Redeclaring math accent \widetilde on input line 1846.
 LaTeX Font Info:    Redeclaring math accent \vec on input line 1848.
 )
+("C:/Program Files/MiKTeX/tex/latex/float/float.sty"
+Package: float 2001/11/08 v1.3d Float enhancements (AL)
+\c@float@type=\count346
+\float@exts=\toks46
+\float@box=\box70
+\@float@everytoks=\toks47
+\@floatcapt=\box71
+)
+("C:/Program Files/MiKTeX/tex/latex/titlesec/titlesec.sty"
+Package: titlesec 2025/01/04 v2.17 Sectioning titles
+\ttl@box=\box72
+\beforetitleunit=\skip60
+\aftertitleunit=\skip61
+\ttl@plus=\dimen303
+\ttl@minus=\dimen304
+\ttl@toksa=\toks48
+\titlewidth=\dimen305
+\titlewidthlast=\dimen306
+\titlewidthfirst=\dimen307
+)
 ("C:/Program Files/MiKTeX/tex/latex/setspace/setspace.sty"
 Package: setspace 2022/12/04 v6.7b set line spacing
 )
-\c@thm=\count331
+\c@thm=\count347
 
 ("C:/Program Files/MiKTeX/tex/latex/wasysym/wasysym.sty"
 Package: wasysym 2020/01/19 v2.4 Wasy-2 symbol support package
@@ -859,7 +1013,7 @@ Package: expl3 2026-01-19 L3 programming layer (loader)
 
 ("C:/Program Files/MiKTeX/tex/latex/l3backend/l3backend-luatex.def"
 File: l3backend-luatex.def 2025-10-09 L3 backend support: PDF output (LuaTeX)
-\l__color_backend_stack_int=\count332
+\l__color_backend_stack_int=\count348
 Inserting `l3color' in `luaotfload.parse_color'.))
 Package: xparse 2025-10-09 L3 Experimental document command parser
 )
@@ -868,20 +1022,20 @@ Lua module: fontspec 2025/09/29 v2.9g Font selection for XeLaTeX and LuaLaTeX
 ("C:/Program Files/MiKTeX/tex/latex/fontspec/fontspec-luatex.sty"
 Package: fontspec-luatex 2025/09/29 v2.9g Font selection for XeLaTeX and LuaLaT
 eX
-\l__fontspec_script_int=\count333
-\l__fontspec_language_int=\count334
-\l__fontspec_strnum_int=\count335
-\l__fontspec_tmp_int=\count336
-\l__fontspec_tmpa_int=\count337
-\l__fontspec_tmpb_int=\count338
-\l__fontspec_tmpc_int=\count339
-\l__fontspec_em_int=\count340
-\l__fontspec_emdef_int=\count341
-\l__fontspec_strong_int=\count342
-\l__fontspec_strongdef_int=\count343
-\l__fontspec_tmpa_dim=\dimen299
-\l__fontspec_tmpb_dim=\dimen300
-\l__fontspec_tmpc_dim=\dimen301
+\l__fontspec_script_int=\count349
+\l__fontspec_language_int=\count350
+\l__fontspec_strnum_int=\count351
+\l__fontspec_tmp_int=\count352
+\l__fontspec_tmpa_int=\count353
+\l__fontspec_tmpb_int=\count354
+\l__fontspec_tmpc_int=\count355
+\l__fontspec_em_int=\count356
+\l__fontspec_emdef_int=\count357
+\l__fontspec_strong_int=\count358
+\l__fontspec_strongdef_int=\count359
+\l__fontspec_tmpa_dim=\dimen308
+\l__fontspec_tmpb_dim=\dimen309
+\l__fontspec_tmpc_dim=\dimen310
 
 ("C:/Program Files/MiKTeX/tex/latex/base/fontenc.sty"
 Package: fontenc 2025/07/18 v2.1d Standard LaTeX package
@@ -950,79 +1104,60 @@ Package fontspec Info:
 ("C:/Program Files/MiKTeX/tex/latex/textpos/textpos.sty"
 Package: textpos 2022/07/23 v1.10.1
 Package textpos Info: choosing support for LaTeX3 on input line 60.
-\TP@textbox=\box70
-\TP@holdbox=\box71
-\TPHorizModule=\dimen302
-\TPVertModule=\dimen303
-\TP@margin=\dimen304
-\TP@absmargin=\dimen305
+\TP@textbox=\box73
+\TP@holdbox=\box74
+\TPHorizModule=\dimen311
+\TPVertModule=\dimen312
+\TP@margin=\dimen313
+\TP@absmargin=\dimen314
 
 Grid set 16 x 16 = 37.34424pt x 52.81541pt
-\TPboxrulesize=\dimen306
-\TP@ox=\dimen307
-\TP@oy=\dimen308
-\TP@tbargs=\toks45
+\TPboxrulesize=\dimen315
+\TP@ox=\dimen316
+\TP@oy=\dimen317
+\TP@tbargs=\toks49
 TextBlockOrigin set to 0pt x 0pt
 ) (./tesi.aux)
 \openout1 = tesi.aux
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 161.
-LaTeX Font Info:    ... okay on input line 161.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 171.
+LaTeX Font Info:    ... okay on input line 171.
  ("C:/Program Files/MiKTeX/tex/context/base/mkii/supp-pdf.mkii"
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count344
-\scratchdimen=\dimen309
-\scratchbox=\box72
-\nofMPsegments=\count345
-\nofMParguments=\count346
-\everyMPshowfont=\toks46
-\MPscratchCnt=\count347
-\MPscratchDim=\dimen310
-\MPnumerator=\count348
-\makeMPintoPDFobject=\count349
-\everyMPtoPDFconversion=\toks47
+\scratchcounter=\count360
+\scratchdimen=\dimen318
+\scratchbox=\box75
+\nofMPsegments=\count361
+\nofMParguments=\count362
+\everyMPshowfont=\toks50
+\MPscratchCnt=\count363
+\MPscratchDim=\dimen319
+\MPnumerator=\count364
+\makeMPintoPDFobject=\count365
+\everyMPtoPDFconversion=\toks51
 ) ("C:/Program Files/MiKTeX/tex/latex/epstopdf-pkg/epstopdf-base.sty"
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 
-("C:/Program Files/MiKTeX/tex/generic/infwarerr/infwarerr.sty"
-Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)
-)
 ("C:/Program Files/MiKTeX/tex/latex/grfext/grfext.sty"
 Package: grfext 2019/12/03 v1.3 Manage graphics extensions (HO)
-
-("C:/Program Files/MiKTeX/tex/generic/kvdefinekeys/kvdefinekeys.sty"
-Package: kvdefinekeys 2019-12-19 v1.6 Define keys (HO)
-))
-("C:/Program Files/MiKTeX/tex/latex/kvoptions/kvoptions.sty"
-Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
-
-("C:/Program Files/MiKTeX/tex/generic/ltxcmds/ltxcmds.sty"
-Package: ltxcmds 2023-12-04 v1.26 LaTeX kernel commands for general use (HO)
-)
-("C:/Program Files/MiKTeX/tex/latex/kvsetkeys/kvsetkeys.sty"
-Package: kvsetkeys 2022-10-05 v1.19 Key value parser (HO)
-))
-("C:/Program Files/MiKTeX/tex/generic/pdftexcmds/pdftexcmds.sty"
-Package: pdftexcmds 2020-06-27 v0.33 Utility functions of pdfTeX for LuaTeX (HO
-)
-Package pdftexcmds Info: \pdf@primitive is available.
-Package pdftexcmds Info: \pdf@ifprimitive is available.
-Package pdftexcmds Info: \pdfdraftmode found.
-\pdftexcmds@toks=\toks48
 )
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 85.
@@ -1069,31 +1204,36 @@ File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-\c@lstlisting=\count350
+\c@lstlisting=\count366
+Package hyperref Info: Link coloring OFF on input line 171.
+(./tesi.out) (./tesi.out)
+\@outlinefile=\write4
+
+\openout4 = tesi.out
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 10.95pt on input line 166.
-<LogoUniToConvertito.png, id=4, 223.83624pt x 281.05pt>
+(Font)              scaled to size 10.95pt on input line 176.
+<LogoUniToConvertito.png, id=158, 223.83624pt x 281.05pt>
 File: LogoUniToConvertito.png Graphic file (type png)
 <use LogoUniToConvertito.png>
-Package luatex.def Info: LogoUniToConvertito.png  used on input line 169.
+Package luatex.def Info: LogoUniToConvertito.png  used on input line 179.
 (luatex.def)             Requested size: 104.42155pt x 131.11574pt.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 18.0pt on input line 174.
+(Font)              scaled to size 18.0pt on input line 184.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 18.0pt on input line 175.
+(Font)              scaled to size 18.0pt on input line 185.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/it' will be
-(Font)              scaled to size 18.0pt on input line 179.
+(Font)              scaled to size 18.0pt on input line 189.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 20.0pt on input line 184.
+(Font)              scaled to size 20.0pt on input line 194.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 20.0pt on input line 185.
+(Font)              scaled to size 20.0pt on input line 195.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.4pt on input line 189.
+(Font)              scaled to size 14.4pt on input line 199.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/m/n' will be
-(Font)              scaled to size 14.0pt on input line 194.
+(Font)              scaled to size 14.0pt on input line 204.
 LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
-(Font)              scaled to size 14.0pt on input line 198.
-[1{C:/Users/filip/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
+(Font)              scaled to size 14.0pt on input line 208.
+ [1{C:/Users/filip/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
 
 
 <./LogoUniToConvertito.png>] [2
@@ -1101,36 +1241,37 @@ LaTeX Font Info:    Font shape `TU/Tahoma(0)/b/n' will be
 
 ]
 LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 2
-48.
- ("C:/Program Files/MiKTeX/tex/latex/lm/ot1lmr.fd"
+58.
+
+("C:/Program Files/MiKTeX/tex/latex/lm/ot1lmr.fd"
 File: ot1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OML+lmm on input line 2
-48.
+58.
 
 ("C:/Program Files/MiKTeX/tex/latex/lm/omllmm.fd"
 File: omllmm.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-LaTeX Font Info:    Trying to load font information for U+rsfs on input line 24
+LaTeX Font Info:    Trying to load font information for U+rsfs on input line 25
 8.
 
 ("C:/Program Files/MiKTeX/tex/latex/jknappen/ursfs.fd"
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 )
-LaTeX Font Info:    Trying to load font information for U+msa on input line 248
+LaTeX Font Info:    Trying to load font information for U+msa on input line 258
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsa.fd"
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 248
+LaTeX Font Info:    Trying to load font information for U+msb on input line 258
 .
 
 ("C:/Program Files/MiKTeX/tex/latex/amsfonts/umsb.fd"
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Trying to load font information for U+stmry on input line 2
-48.
+58.
 
 ("C:/Program Files/MiKTeX/tex/latex/stmaryrd/ustmry.fd")
 luaotfload | db : Reload initiated (formats: otf,ttf,ttc); reason: Font "stmary8
@@ -1139,7 +1280,7 @@ luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
 luaotfload | resolve : sequence of 3 lookups yielded nothing appropriate.
-LaTeX Font Info:    Trying to load font information for U+wasy on input line 24
+LaTeX Font Info:    Trying to load font information for U+wasy on input line 25
 8.
 
 ("C:/Program Files/MiKTeX/tex/latex/wasysym/uwasy.fd"
@@ -1153,85 +1294,122 @@ File: uwasy.fd 2020/01/19 v2.4 Wasy-2 symbol font definitions
 
 
 ]
-(./tesi.toc [5] [6])
-\tf@toc=\write4
+(./tesi.toc [5])
+\tf@toc=\write5
 
-\openout4 = tesi.toc
- [7] [8
+\openout5 = tesi.toc
+ [6]
+Capitolo 1.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-]
-Chapter 1.
+warning  (pdf backend): ignoring duplicate destination with the name 'page.1'
 [1
 
-] [2] [3] [4
+
 
 ]
-Chapter 2.
-<fig_specular_principle.png, id=56, 1573.88pt x 674.52pt>
+warning  (pdf backend): ignoring duplicate destination with the name 'page.2'
+[2]
+Capitolo 2.
+<fig_specular_principle.png, id=247, 1573.88pt x 674.52pt>
 File: fig_specular_principle.png Graphic file (type png)
 <use fig_specular_principle.png>
-Package luatex.def Info: fig_specular_principle.png  used on input line 304.
+Package luatex.def Info: fig_specular_principle.png  used on input line 368.
 (luatex.def)             Requested size: 375.80542pt x 161.05443pt.
+[3
 
-Underfull \vbox (badness 2213) has occurred while \output is active []
 
- [5<./fig_specular_principle.png>] [6] [7] [8]
-<diagramma_proiezione.png, id=81, 1413.28pt x 770.88pt>
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.2.1
+'
+<./fig_specular_principle.png>] [4] [5] [6]
+<diagramma_proiezione.png, id=293, 1413.28pt x 770.88pt>
 File: diagramma_proiezione.png Graphic file (type png)
 <use diagramma_proiezione.png>
-Package luatex.def Info: diagramma_proiezione.png  used on input line 360.
+Package luatex.def Info: diagramma_proiezione.png  used on input line 423.
 (luatex.def)             Requested size: 422.77661pt x 230.60707pt.
- [9<./diagramma_proiezione.png>] [10]
-Chapter 3.
-[11
+ [7
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.2.2
+'
+<./diagramma_proiezione.png>] [8]
+Capitolo 3.
 
-] [12
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
-]
-Chapter 4.
-[13] [14
-
-]
-Chapter 5.
-[15] [16
+ [9
 
 ]
-Chapter 6.
-[17] [18
+<rdeits.png, id=308, 762.59906pt x 749.80125pt>
+File: rdeits.png Graphic file (type png)
+<use rdeits.png>
+Package luatex.def Info: rdeits.png  used on input line 464.
+(luatex.def)             Requested size: 211.3883pt x 207.83777pt.
+
+[10]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [11
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.1
+'
+<./rdeits.png>]
+Underfull \vbox (badness 1308) has occurred while \output is active []
+
+ [12]
+
+LaTeX Warning: No positions in optional float specifier.
+               Default added (so using `tbp') on input line 484.
+
+<hz1.png, id=328, 1444.64719pt x 902.6222pt>
+File: hz1.png Graphic file (type png)
+<use hz1.png>
+Package luatex.def Info: hz1.png  used on input line 486.
+(luatex.def)             Requested size: 446.2658pt x 278.8321pt.
+
+Underfull \hbox (badness 1803) in paragraph at lines 487--487
+[]\TU/lmr/m/n/10.95 Fi-gu-ra 3.2: []Interfaccia gra-fi-ca del pro-gram-ma \TU/l
+mtt/m/n/10.95 HoloZens \TU/lmr/m/n/10.95 ([]$\TU/lmtt/m/n/10.95 https://github.c
+om/aaronse/
+ []
+
+[13
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.2
+'
+<./hz1.png>]
+<hz2.png, id=340, 1863.21094pt x 754.31813pt>
+File: hz2.png Graphic file (type png)
+<use hz2.png>
+Package luatex.def Info: hz2.png  used on input line 500.
+(luatex.def)             Requested size: 493.24417pt x 199.68617pt.
+
+Overfull \hbox (23.48918pt too wide) in paragraph at lines 500--501
+ [][] 
+ []
+
+[14
+warning  (pdf backend): ignoring duplicate destination with the name 'figure.3.3
+'
+<./hz2.png>] [15] [16] [17] [18
 
 ]
-Chapter 7.
+Capitolo 4.
 [19] [20
 
 ]
-Chapter 8.
+Capitolo 5.
 [21] [22
 
 ]
-Chapter 9.
+Capitolo 6.
 [23] [24
 
 ]
-Chapter 10.
+Capitolo 7.
 [25] [26
 
-]
-Chapter 11.
+] [27] [28
 
-LaTeX Warning: Citation `APS1' on page 27 undefined on input line 443.
-
-
-LaTeX Warning: Reference `ps:2' on page 27 undefined on input line 445.
-
-
-LaTeX Warning: Reference `sec:11' on page 27 undefined on input line 447.
-
-[27] [28
-
-] [29] [30
-
-] [31
+] [29
 
 
 ] (./tesi.aux)
@@ -1241,38 +1419,46 @@ L3 programming layer <2026-01-19>
  ***********
 
 
-LaTeX Warning: There were undefined references.
+Package rerunfilecheck Warning: File `tesi.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
 
+Package rerunfilecheck Info: Checksums for `tesi.out':
+(rerunfilecheck)             Before: 58132E5B8D370B59FB92DE01C5F6C5AB;8572
+(rerunfilecheck)             After:  E963951534EE7F440987F1291F53C398;8338.
 )
 
 Here is how much of LuaTeX's memory you used:
- 25444 strings out of 476076
- 100000,953878 words of node,token memory allocated
- 560 words of node memory still in use:
-   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 16 attribute, 54 glue_spec
-, 9 attribute_list, 2 write nodes
-   avail lists: 2:965,3:301,4:130,5:385,6:73,7:8723,8:12,9:498,10:32,11:835
- 47218 multiletter control sequences out of 65536+600000
- 85 fonts using 16028751 bytes
- 98i,6n,104p,1466b,267s stack positions out of 10000i,1000n,20000p,200000b,200000s
-{C:/Program Files/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKT
-eX/fonts/enc/dvips/lm/lm-rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbo
-l/MnSymbolE.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolD.enc}
-{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolC.enc}<c:/program file
-s/miktex/fonts/opentype/public/lm/lmroman10-italic.otf><c:/program files/miktex/
-fonts/opentype/public/lm/lmroman10-bold.otf><c:/program files/miktex/fonts/opent
-ype/public/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/opentype/public/
-lm/lmroman10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Windows/Fonts/verdanai
-.ttf><C:/Windows/Fonts/tahomabd.ttf><C:/Program Files/MiKTeX/fonts/type1/public/
-mnsymbol/MnSymbol10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pf
-b><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Program Files/MiK
-TeX/fonts/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public
-/lm/lmmi8.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Progr
-am Files/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/ty
-pe1/public/amsfonts/symbols/msbm10.pfb>
-Output written on tesi.pdf (41 pages, 1170867 bytes).
+ 32668 strings out of 476076
+ 125007,1144653 words of node,token memory allocated
+ 604 words of node memory still in use:
+   7 hlist, 2 vlist, 2 rule, 3 glue, 4 kern, 4 glyph, 20 attribute, 58 glue_spec
+, 11 attribute_list, 2 write, 2 pdf_action nodes
+   avail lists: 2:887,3:285,4:92,5:499,6:81,7:11955,8:46,9:434,10:43,11:2002
+ 54229 multiletter control sequences out of 65536+600000
+ 84 fonts using 15891463 bytes
+ 98i,6n,104p,1466b,514s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-PDF statistics: 230 PDF objects out of 1000 (max. 8388607)
- 0 named destinations out of 1000 (max. 1048576)
- 16 words of extra memory for PDF output out of 10000 (max. 100000000)
+warning  (pdf backend): unreferenced destination with name 'section.3.4'
+<c:/program files/miktex/fonts/opentype/public/lm/lmmono10-regular.otf>{C:/Progr
+am Files/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Program Files/MiKTeX/fonts/
+enc/dvips/lm/lm-rm.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbo
+lE.enc}{C:/Program Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolD.enc}{C:/Progr
+am Files/MiKTeX/fonts/enc/dvips/mnsymbol/MnSymbolC.enc}<c:/program files/miktex/
+fonts/opentype/public/lm/lmroman10-italic.otf><c:/program files/miktex/fonts/ope
+ntype/public/lm/lmroman10-bold.otf><c:/program files/miktex/fonts/opentype/publi
+c/lm/lmroman12-bold.otf><c:/program files/miktex/fonts/opentype/public/lm/lmroma
+n10-regular.otf><C:/Windows/Fonts/tahoma.ttf><C:/Windows/Fonts/verdanai.ttf><C:/
+Windows/Fonts/tahomabd.ttf><C:/Program Files/MiKTeX/fonts/type1/public/mnsymbol/
+MnSymbol10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Pro
+gram Files/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Program Files/MiKTeX/fonts
+/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmmi8
+.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Program Files/
+MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fonts/type1/publi
+c/amsfonts/symbols/msbm10.pfb>
+Output written on tesi.pdf (37 pages, 3563807 bytes).
+
+PDF statistics: 496 PDF objects out of 1000 (max. 8388607)
+ 85 named destinations out of 1000 (max. 1048576)
+ 320 words of extra memory for PDF output out of 10000 (max. 100000000)
 

@@ -18,17 +18,27 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,calc,positioning}
 \usepackage{lmodern}
-\usepackage[english]{babel}
+\usepackage[italian]{babel}
 \usepackage{geometry}
 \geometry{a4paper,top=3cm,bottom=3cm,left=3.5cm,right=3.5cm,heightrounded,bindingoffset=5mm}
 \usepackage{booktabs}
 \usepackage{listings}
 \usepackage{emptypage}
-%\usepackage{hyperref}
+\usepackage{hyperref}
 \usepackage{cleveref}
 \usepackage{enumerate}
 \usepackage{indentfirst}
 \usepackage{MnSymbol}
+\usepackage{float}
+
+%questo rimuove la scritta "Capitolo 1" e lascia direttamente "Introduzione"
+\renewcommand{\contentsname}{Indice}
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]
+{\normalfont\Huge\bfseries}
+{\thechapter.}
+{1ex}
+{}
 
 
 \newcommand{\Z}{\mathbb{Z}}
@@ -271,32 +281,86 @@ ItalicFont={Verdana Italic},
 	
 	\mainmatter
 	
+	
 	\chapter{Introduzione}
 	
-	\section{Contesto e motivazioni}
-	La rappresentazione tridimensionale tramite modelli digitali costituisce uno strumento consolidato in ambito informatico e ingegneristico. Formati come STL descrivono un oggetto attraverso una mesh triangolare, permettendo di manipolarne la geometria e, in molti casi, di fabbricarlo fisicamente. Il passaggio dal modello 3D alla produzione avviene normalmente attraverso una pipeline definita: il modello viene elaborato da uno slicer o da un software CAM che genera le traiettorie macchina necessarie alla stampa o alla lavorazione.
-	Esistono però modalità di rappresentazione della forma che non si basano sulla produzione volumetrica dell’oggetto, ma sulla generazione controllata di effetti ottici. Tra queste rientrano gli scratch hologram, una tecnica di olografia analogica in cui l’illusione di profondità non è ottenuta tramite interferenza coerente, ma attraverso incisioni opportunamente orientate su una superficie riflettente. La tridimensionalità percepita nasce dal comportamento speculare della luce: ogni micro-incisione produce un punto luminoso che si sposta al variare del punto di vista, contribuendo alla ricostruzione visiva di una forma tridimensionale virtuale.
-	In questo contesto il modello 3D non viene fabbricato direttamente, ma utilizzato come sorgente di informazione geometrica. Il problema non è più quello di riempire un volume, bensì di determinare una distribuzione di traiettorie bidimensionali capaci di produrre, in condizioni controllate, un comportamento speculare coerente con una geometria tridimensionale di riferimento. Non si tratta semplicemente di proiettare un modello su un piano, ma di tradurre informazioni geometriche tridimensionali in percorsi di incisione compatibili con i vincoli di una macchina CNC.
-	Dal punto di vista computazionale, questa trasformazione non è immediata. Una mesh triangolare descrive superfici tramite vertici e facce; una macchina a controllo numerico esegue movimenti planari codificati in G-code. Occorre quindi definire una procedura che colleghi questi due livelli di rappresentazione: da un lato la struttura topologica e geometrica della mesh, dall’altro un insieme ordinato di archi o segmenti idonei alla fabbricazione.
-	Sono disponibili strumenti open source che affrontano la generazione di scratch hologram a partire da modelli tridimensionali. Tali soluzioni mostrano la fattibilità dell’approccio, ma presentano limiti in termini di stabilità e controllo del processo. In particolare, l’esecuzione può risultare instabile anche su modelli geometricamente semplici, rendendo difficile un utilizzo sistematico e riproducibile all’interno di una pipeline di fabbricazione digitale.
+	La rappresentazione tridimensionale tramite modelli digitali costituisce
+	uno strumento consolidato in ambito informatico e ingegneristico. Formati
+	come STL descrivono un oggetto attraverso una mesh triangolare, permettendo
+	di manipolarne la geometria e, in molti casi, di fabbricarlo fisicamente.
+	Il passaggio dal modello 3D alla produzione avviene normalmente attraverso
+	una pipeline definita: il modello viene elaborato da uno slicer o da un
+	software CAM che genera le traiettorie macchina necessarie alla stampa o
+	alla lavorazione.
+	Esistono però modalità di rappresentazione della forma che non si basano
+	sulla riproduzione volumetrica dell'oggetto, ma sulla generazione
+	controllata di effetti ottici. Tra queste rientrano gli scratch hologram,
+	una tecnica di olografia analogica in cui l'illusione di profondità non è
+	ottenuta tramite interferenza coerente, bensì attraverso incisioni
+	opportunamente orientate su una superficie riflettente. La tridimensionalità
+	percepita nasce dal comportamento speculare della luce: ogni micro-incisione
+	produce un punto luminoso che si sposta al variare del punto di vista,
+	contribuendo alla ricostruzione visiva di una forma tridimensionale virtuale.
+	In questo contesto il modello 3D non viene fabbricato direttamente, ma
+	utilizzato come sorgente di informazione geometrica. Il problema non è più
+	quello di riempire un volume, bensì di determinare una distribuzione di
+	traiettorie bidimensionali capaci di produrre, in condizioni controllate,
+	un comportamento speculare coerente con la geometria tridimensionale di
+	riferimento. Dal punto di vista computazionale, questa trasformazione non
+	è immediata: una mesh triangolare descrive superfici tramite vertici e
+	facce, mentre una macchina a controllo numerico esegue movimenti planari
+	codificati in G-code. Occorre quindi definire una procedura che colleghi
+	questi due livelli di rappresentazione, da un lato la struttura topologica
+	e geometrica della mesh, dall'altro un insieme ordinato di archi idonei
+	alla fabbricazione.
+	Sono disponibili strumenti open source che affrontano la generazione di
+	scratch hologram a partire da modelli tridimensionali e ne dimostrano la
+	fattibilità. Tali soluzioni presentano però limiti in termini di stabilità
+	e controllabilità del processo: l'esecuzione può risultare instabile anche
+	su modelli geometricamente semplici, e le scelte geometriche adottate
+	internamente non sono sempre esplicite, rendendo difficile un utilizzo
+	sistematico all'interno di una pipeline di fabbricazione digitale.
 	
-	La motivazione del presente lavoro nasce dall’esigenza di definire una pipeline computazionale chiara e formalizzata, capace di trasformare un modello 3D in un insieme di traiettorie di incisione esportabili in modo coerente. L’obiettivo non è implementare un modello fisico completo della riflessione luminosa, ma costruire un approccio geometrico esplicito e riproducibile, che renda trasparenti le scelte adottate e che possa essere analizzato e migliorato nel tempo. Il problema centrale può essere sintetizzato nel seguente modo: dato un modello 3D espresso come mesh triangolare, come generare un insieme di percorsi macchina tali da produrre, su una superficie piana, un effetto visivo coerente con la forma originale?
-	
-	\section{Obiettivi della tesi}
-	L’obiettivo principale della presente tesi è definire e implementare una pipeline computazionale capace di trasformare un modello tridimensionale, espresso come mesh triangolare in formato STL, in un insieme di traiettorie di incisione bidimensionali esportabili in G-code. Il problema viene affrontato in termini geometrici, ponendo al centro la relazione tra rappresentazione discreta della superficie e generazione di percorsi macchina compatibili con la fabbricazione su piano. Un primo obiettivo consiste quindi nella formalizzazione del passaggio dal dominio tridimensionale al dominio bidimensionale, individuando quali elementi della mesh siano significativi ai fini della generazione del pattern inciso e come debbano essere trattati dal punto di vista matematico. In particolare, si intende definire un modello operativo per l’estrazione e il campionamento degli spigoli della mesh, la loro proiezione su un piano secondo una configurazione di vista controllata e la successiva generazione di archi che rappresentino le micro-incisioni responsabili dell’effetto speculare.
-	Un secondo obiettivo consiste nell’analisi critica di strumenti software esistenti per la generazione di scratch hologram a partire da modelli tridimensionali, con particolare attenzione alla loro struttura interna, ai limiti di stabilità e alle scelte geometriche implicite. A partire da tale analisi, il lavoro si propone di rielaborare e sistematizzare una pipeline operativa, rendendone espliciti i passaggi fondamentali e verificandone il comportamento su casi di test controllati. Questo processo non si limita all’utilizzo dello strumento, ma mira a comprenderne il funzionamento, evidenziarne le criticità e introdurre modifiche mirate volte a migliorarne la controllabilità e la coerenza con l’obiettivo di fabbricazione digitale.
-	Un ulteriore obiettivo è garantire la coerenza tra simulazione e fabbricazione, assicurando che le traiettorie visualizzate in fase di preview corrispondano effettivamente a quelle esportate in formato SVG e G-code. Ciò implica la gestione delle convenzioni di coordinate, delle trasformazioni di scala e dei vincoli numerici propri delle macchine CNC. La tesi non si propone di sviluppare un modello fisico completo della riflessione luminosa, ma di costruire un approccio geometrico semplificato, sufficientemente controllabile da produrre un effetto visivo qualitativamente coerente con il modello tridimensionale di partenza. L’obiettivo finale è quindi fornire una soluzione autonoma e analizzabile, che colleghi in modo esplicito il modello 3D alla generazione del codice macchina, costituendo una base solida per eventuali estensioni future sia in ambito computazionale sia in ambito sperimentale.
-	
-	\section{Contributi del lavoro}
-	Il contributo principale del lavoro consiste nella formalizzazione esplicita del processo che consente di passare da un modello tridimensionale espresso come mesh triangolare alla generazione di traiettorie di incisione bidimensionali esportabili in G-code. In particolare, è stata condotta un’analisi critica di un software open source esistente, originariamente sviluppato in C++, seguita da una reimplementazione in Python della sua logica geometrica, con l’obiettivo di migliorarne stabilità, controllabilità e integrazione all’interno di una pipeline di fabbricazione digitale.
-	Un primo contributo riguarda la definizione operativa del modello geometrico adottato per la generazione degli archi a partire dagli spigoli della mesh, chiarendo il ruolo della configurazione di vista, della proiezione e dei parametri di campionamento. Un secondo contributo consiste nell’integrazione coerente tra fase di preview e fase di esportazione, garantendo che le traiettorie visualizzate in ambiente desktop coincidano con quelle effettivamente convertite in formato SVG e G-code. È stata inoltre condotta un’analisi del problema della visibilità e dell’occlusione tramite un approccio conservativo basato su Z-buffer, con l’obiettivo di ridurre la generazione di incisioni non visibili dal punto di vista selezionato. Il lavoro include infine una valutazione sperimentale della pipeline su modelli geometrici di complessità crescente, evidenziandone comportamento, limiti e possibili direzioni di miglioramento. Nel complesso, il contributo della tesi non risiede nell’introduzione di un nuovo modello ottico, ma nella costruzione di un processo computazionale esplicito, analizzabile e riproducibile che collega in modo diretto la rappresentazione tridimensionale alla fabbricazione digitale su piano.
+	Il presente lavoro nasce dall'esigenza di definire una pipeline
+	computazionale chiara e formalizzata, capace di trasformare un modello 3D
+	in un insieme di traiettorie di incisione esportabili in modo riproducibile.
+	A partire dall'analisi critica di un software esistente, originariamente
+	sviluppato in C++, è stata condotta una reimplementazione in Python della
+	sua logica geometrica, con l'obiettivo di migliorarne stabilità,
+	controllabilità e integrazione con i formati di fabbricazione digitale.
+	Il problema centrale può essere formulato nel modo seguente: dato un modello
+	3D espresso come mesh triangolare, come generare un insieme di percorsi
+	macchina tali da produrre, su una superficie piana, un effetto visivo
+	coerente con la forma originale?
+	La risposta proposta non introduce un modello fisico completo della
+	riflessione luminosa, ma costruisce un approccio geometrico semplificato
+	ed esplicito, fondato sull'estrazione e il campionamento degli spigoli della
+	mesh, sulla loro proiezione secondo una configurazione di vista controllata
+	e sulla generazione di archi che approssimano il comportamento speculare
+	atteso. Un aspetto tecnico rilevante riguarda la gestione della visibilità:
+	le traiettorie generate a partire da punti occlusi da altre porzioni del
+	modello producono incisioni non visibili dal punto di vista selezionato e
+	potenzialmente dannose per la leggibilità dell'effetto finale. Per ridurre
+	questo problema, è stato adottato un approccio conservativo basato su
+	Z-buffer, che consente di filtrare le traiettorie associate a punti non
+	visibili prima dell'esportazione. La pipeline produce output in due formati
+	distinti: SVG, per la verifica visiva del pattern generato, e G-code, per
+	l'esecuzione diretta su macchine CNC. Un ulteriore problema affrontato
+	riguarda la coerenza tra fase di preview e fase di esportazione: le
+	traiettorie visualizzate nell'applicazione desktop devono corrispondere
+	esattamente a quelle scritte nei file di output, condizione non banale in
+	presenza di trasformazioni di scala, inversioni di asse e parametri di
+	filtraggio che agiscono sia sulla visualizzazione sia sull'esportazione.
+	Il contributo della tesi non risiede nell'introduzione di un nuovo modello
+	ottico, ma nella costruzione di un processo computazionale esplicito,
+	analizzabile e riproducibile, che colleghi in modo diretto la
+	rappresentazione tridimensionale alla fabbricazione digitale su piano.
 	
 	\chapter{Fondamenti teorici}
 	
 	\section{Scratch hologram e olografia analogica}
 	
 	Gli scratch hologram costituiscono una tecnica di rappresentazione tridimensionale basata su incisioni realizzate su superfici riflettenti. A differenza dell’olografia interferometrica tradizionale, fondata sulla registrazione del fronte d’onda tramite interferenza di luce coerente, gli scratch hologram operano nel dominio dell’ottica geometrica. L’effetto tridimensionale non deriva dalla ricostruzione della fase dell’onda luminosa, ma dal controllo della riflessione speculare.
-	
 	Il principio alla base di questa tecnica è riconducibile alla cosiddetta \emph{specular holography}, formalizzata in modo sistematico da Brand \cite{Brand2011}. In tale approccio, una superficie opportunamente sagomata è progettata in modo da riflettere la luce verso l’osservatore secondo traiettorie controllate, producendo punti luminosi la cui posizione apparente varia al variare del punto di vista. Il sistema visivo interpreta questo spostamento come informazione di profondità, generando la percezione di una forma tridimensionale.
 	
 		\begin{figure}[h]
@@ -307,7 +371,6 @@ ItalicFont={Verdana Italic},
 	\end{figure}
 	
 	Nel caso degli scratch hologram, la superficie speculare ideale viene approssimata tramite incisioni discrete, spesso sotto forma di archi o curve semplici. Ogni micro-incisione agisce come un elemento direzionale di riflessione: al variare della direzione di osservazione, il punto di massima luminosità associato alla curva incisa si sposta lungo una traiettoria percepita nello spazio. L’insieme coordinato di tali incisioni permette di simulare una geometria tridimensionale virtuale.
-	
 	La generazione computazionale di strutture di questo tipo è stata affrontata in ambito grafico e ottico con diversi approcci. Regg et al. hanno introdotto il concetto di \emph{computational highlight holography}, proponendo un metodo per derivare micro-superfici speculari a partire da modelli tridimensionali digitali \cite{Regg2010}. In modo analogo, Augier Calderín e Sánchez Pérez hanno studiato la possibilità di generare scratch hologram mediante elaborazione software e incisione laser, definendo il termine \emph{hologravure} per indicare una generalizzazione digitale della tecnica \cite{Augier2008, Hologravure2011}.
 	È importante sottolineare che queste tecniche non ricostruiscono un fronte d’onda nel senso fisico dell’olografia classica, ma producono un’illusione tridimensionale efficace entro un intervallo limitato di condizioni di osservazione. Il modello adottato nella presente tesi si colloca in questo quadro: l’obiettivo non è la simulazione completa dei fenomeni ondulatori, bensì la definizione di una procedura geometrica che consenta di generare traiettorie di incisione coerenti con il comportamento speculare atteso.
 	
@@ -371,80 +434,134 @@ ItalicFont={Verdana Italic},
 	A questo punto interviene il modello geometrico per la generazione delle traiettorie di incisione. Per ogni punto proiettato viene costruita una curva, tipicamente un arco circolare o ellittico, definita nello spazio bidimensionale. La geometria dell’arco dipende dalla posizione del punto proiettato e dalla sua profondità relativa rispetto alla configurazione di vista. In termini operativi, la profondità influenza l’estensione e la posizione dell’arco nel piano, mentre la proiezione determina il centro o il riferimento geometrico della traiettoria.
 	L’insieme degli archi generati a partire dai punti campionati costituisce il pattern di incisione. Tale insieme non rappresenta una ricostruzione continua della superficie speculare ideale, ma un’approssimazione discreta ottenuta a partire da elementi locali della mesh. La qualità dell’effetto percepito dipende dalla densità di campionamento, dalla configurazione di vista e dai parametri che regolano la generazione delle curve.
 	Il passaggio dal punto tridimensionale alla traiettoria bidimensionale può quindi essere interpretato come una trasformazione composta: selezione di un elemento significativo della mesh, campionamento discreto, proiezione nello spazio immagine e costruzione di una curva parametrica nel piano. Questa sequenza di operazioni costituisce il nucleo concettuale della pipeline sviluppata nel presente lavoro.
-%	
+	
 	\chapter{Stato dell’arte}
 	
 	\section{Scratch hologram manuali e approcci artistici}
+	
+	Gli scratch hologram nascono in ambito prevalentemente sperimentale e artistico, prima ancora che computazionale. La realizzazione manuale consiste nell’incidere archi o curve su una superficie riflettente, tipicamente plastica o metallo lucidato, in modo tale che la luce venga riflessa verso l’osservatore secondo traiettorie controllate. L’effetto tridimensionale emerge dalla disposizione coerente di tali incisioni: ciascuna curva produce un riflesso che, al variare della posizione dell’occhio, sembra muoversi lungo una traiettoria nello spazio percepito. L’insieme dei riflessi genera l’impressione di una struttura volumetrica sospesa dietro o davanti al piano inciso.
+	Nella pratica manuale, la costruzione degli archi avviene spesso utilizzando un compasso o guide circolari, partendo da una configurazione geometrica intuitiva. L’autore sceglie una posizione di osservazione di riferimento e realizza incisioni con raggi e centri opportunamente determinati in modo empirico. Il risultato non deriva da una formalizzazione matematica esplicita, ma da un adattamento progressivo tra configurazione di vista e risposta visiva. Questo approccio, pur non essendo rigoroso dal punto di vista teorico, consente di ottenere effetti percettivamente convincenti con mezzi semplici.
+	
+	Dal punto di vista strutturale, gli scratch hologram manuali possono essere interpretati come un’approssimazione discreta di una superficie speculare ideale. Invece di modellare una superficie continua con normale variabile, si utilizzano incisioni isolate che producono riflessi localizzati. L’illusione tridimensionale è efficace entro un intervallo limitato di angoli di osservazione e tende a degradare al di fuori della configurazione per cui le incisioni sono state progettate. Questo comportamento mette in evidenza la natura fortemente direzionale della tecnica.
+	Ai fini della presente tesi, lo studio degli approcci manuali è rilevante perché consente di comprendere quali elementi geometrici siano responsabili dell’effetto percepito. L’uso di archi circolari, la scelta di un piano riflettente e la dipendenza dalla configurazione di vista costituiscono principi che vengono successivamente formalizzati e tradotti in una pipeline computazionale. L’obiettivo non è replicare la pratica artistica, ma astrarne i meccanismi geometrici fondamentali per renderli trattabili in modo sistematico.
+
+	
 	\section{Strumenti software esistenti}
-	\subsection{Soluzioni open-source}
-	\subsection{Limiti rispetto alla fabbricazione digitale}
-	\section{Tecniche affini nella fabbricazione computazionale}
+	
+	La generazione di scratch hologram a partire da modelli tridimensionali è stata affrontata negli anni da diversi progetti open source, sviluppati con obiettivi e compromessi differenti. L’analisi di tali strumenti è rilevante non solo per comprendere lo stato dell’arte tecnico, ma anche per individuare le scelte architetturali, gli algoritmi geometrici adottati e i limiti pratici che emergono nel passaggio dalla rappresentazione 3D alla fabbricazione.
+	Nel presente lavoro sono stati esaminati due progetti disponibili pubblicamente su GitHub che implementano pipeline per la generazione di pattern di scratch hologram. Entrambi consentono, con modalità diverse, di ottenere traiettorie bidimensionali a partire da un modello tridimensionale, ma differiscono per struttura interna, dipendenze tecnologiche, modalità di gestione della visibilità e formati di esportazione. L’analisi non si limita all’utilizzo dell’interfaccia, ma considera l’architettura del codice, il flusso dei dati e la coerenza tra anteprima grafica ed esportazione.
+	L’obiettivo di questa sezione non è valutare tali strumenti in termini qualitativi generici, ma esaminarne il funzionamento in relazione a un criterio preciso: la possibilità di costruire una pipeline autonoma e riproducibile che colleghi in modo diretto un modello STL alla generazione di traiettorie utilizzabili in un contesto di fabbricazione digitale. In questa prospettiva verranno evidenziati punti di forza, scelte progettuali e limiti strutturali, con particolare attenzione alla gestione della visibilità, alla robustezza dell’import dei modelli e alla coerenza tra preview ed esportazione dei risultati.
+	
+	\subsection{ScratchHolograms (rdeits)}
+	
+	Il progetto \texttt{ScratchHolograms}, sviluppato da Robin Deits, rappresenta uno dei primi tentativi strutturati di generare pattern di scratch hologram a partire da modelli tridimensionali. L’architettura del sistema è ibrida e si basa su tre componenti principali: modellazione in SketchUp, plugin Ruby per l’estrazione dei dati geometrici e script Python 2 per la generazione del pattern finale. Il flusso di lavoro non parte da un file STL caricato direttamente in un programma autonomo, ma richiede la costruzione o l’importazione del modello all’interno dell’ambiente SketchUp desktop.
+	Il plugin Ruby associato al progetto analizza il modello tridimensionale e campiona punti sugli spigoli. Per ciascun punto viene calcolato un intervallo angolare di visibilità, ottenuto tramite test di intersezione nello spazio tridimensionale al variare della posizione dell’osservatore. Questo approccio è concettualmente coerente con la logica degli scratch hologram, poiché la visibilità non viene approssimata in uno spazio bidimensionale proiettato, ma valutata direttamente nel dominio tridimensionale. Il risultato dell’analisi viene salvato in un file intermedio con estensione \texttt{.pattern}, che contiene l’elenco dei punti campionati e gli intervalli angolari associati.
+	Gli script Python leggono successivamente il file \texttt{.pattern} e generano il pattern finale sotto forma di PDF e DXF. L’output grafico è semplice e leggibile, costituito principalmente da archi corrispondenti ai punti campionati. Dal punto di vista concettuale, il progetto separa in modo netto la fase di analisi geometrica tridimensionale dalla fase di generazione bidimensionale del pattern. Questa separazione è un elemento interessante sotto il profilo metodologico.
+	
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.45\textwidth]{rdeits.png}
+		\caption[Esempio di output di ScratchHolograms]{Esempio di output generato dal progetto \texttt{ScratchHolograms} (\url{https://github.com/rdeits/ScratchHolograms}).}
+		\label{fig:rdeits}
+	\end{figure}
+	
+	Nonostante la solidità concettuale del calcolo della visibilità, il progetto presenta limiti strutturali rilevanti rispetto a un workflow contemporaneo. In primo luogo, la pipeline non è autonoma: la parte Python non carica direttamente mesh triangolari in formato STL né gestisce internamente l’estrazione degli spigoli. L’intera fase di campionamento e visibilità dipende dall’ambiente SketchUp e dal plugin Ruby. Questo vincolo rende il sistema poco flessibile e difficilmente integrabile in pipeline automatizzate basate su formati mesh standard.
+	Un secondo limite riguarda la dipendenza tecnologica da strumenti oggi obsoleti. Il progetto è dichiaratamente pensato per Python 2.6/2.7 e per versioni desktop storiche di SketchUp con supporto ai plugin Ruby. Le versioni attuali gratuite di SketchUp sono basate su un’interfaccia web che non consente l’installazione diretta di tali plugin, mentre le versioni desktop con supporto estensioni rientrano in piani a pagamento. Ciò introduce un problema di riproducibilità e manutenzione del workflow originario.
+	Dal punto di vista funzionale, l’output è limitato a PDF e DXF. Non è prevista un’esportazione diretta in SVG né, soprattutto, in G-code. Questo implica che il passaggio alla fabbricazione richiede strumenti esterni e conversioni ulteriori, senza garanzia di coerenza tra visualizzazione e toolpath finale. Inoltre, il sistema non offre un’interfaccia interattiva moderna per la regolazione dinamica di parametri quali configurazione di vista, densità di campionamento o profondità prospettica: tali aspetti sono in larga misura vincolati alla configurazione del modello in SketchUp.
+	Nel complesso, \texttt{ScratchHolograms} rappresenta un riferimento storico e concettuale importante per la generazione di scratch hologram computazionali, in particolare per l’attenzione posta al calcolo tridimensionale della visibilità. Nonostante ciò, la dipendenza da un ambiente esterno e la mancanza di una pipeline mesh-to-fabrication autonoma ne limitano l’utilizzo in un contesto di fabbricazione digitale contemporanea.
+	
+	\subsection{hz-scratch-hologram (HoloZens)}
+	
+	Il progetto \texttt{hz-scratch-hologram}, sviluppato nell’ambito del repository HoloZens, rappresenta un’evoluzione significativa rispetto a soluzioni precedenti, poiché integra in un’unica applicazione desktop le fasi di caricamento del modello, proiezione, generazione degli archi e esportazione grafica. L’applicazione è sviluppata in ambiente .NET e basata su WinForms; essa consente il caricamento diretto di file STL e X3D, evitando la dipendenza da strumenti esterni di modellazione. Questo aspetto rende il flusso di lavoro più immediato e apparentemente più vicino a una pipeline autonoma.
+	Il software implementa un proprio modello di camera, definito da parametri espliciti quali posizione dell’osservatore, punto di riferimento e profondità prospettica. L’utente può modificare tali parametri in modo interattivo, orbitando attorno al modello e variando il punto di vista. La mesh viene rappresentata internamente tramite vertici, spigoli e facce, e viene applicata una logica di campionamento sugli spigoli per generare archi nel piano di proiezione. 
+	Dal punto di vista implementativo, il caricamento della geometria avviene tramite un parser STL dedicato, che ricostruisce la mesh a partire dalla lista di triangoli presenti nel file. In particolare, il parser legge le normali e i vertici di ciascun triangolo e costruisce strutture dati interne contenenti vertici, facce e spigoli condivisi. Questa rappresentazione consente al programma di individuare gli spigoli della mesh e di applicare su di essi una logica di campionamento per la generazione degli archi. Gli spigoli costituiscono infatti gli elementi principali su cui viene costruito il pattern bidimensionale.
+	È presente inoltre una modalità avanzata che suddivide gli archi in segmenti visibili su intervalli angolari multipli, avvicinandosi concettualmente all’idea originaria degli scratch hologram basata su variazione del punto di vista.
+	Nel codice, la generazione degli archi è gestita da una componente dedicata al disegno degli spigoli e alla costruzione delle traiettorie sul piano di proiezione. A partire dai punti campionati sugli spigoli della mesh, il programma costruisce archi circolari o segmenti di arco che vengono poi disegnati nella preview o inseriti nelle strutture dati destinate all’esportazione. In modalità avanzata, il programma percorre un insieme discreto di angoli di vista e determina per quali intervalli l’arco risulta visibile. Questa procedura permette di ricostruire porzioni di arco associate a diverse configurazioni di osservazione, ma introduce un costo computazionale significativamente maggiore rispetto alla modalità standard.
+	Un aspetto importante di questa architettura è che molte operazioni dipendono direttamente dallo stato dell’interfaccia grafica. Parametri come posizione della camera, zoom e orientazione della scena vengono modificati interattivamente e influenzano immediatamente il comportamento dell’algoritmo. Questa scelta rende il software intuitivo per l’esplorazione visiva, ma introduce una forte dipendenza dalla sessione corrente dell’applicazione. In altre parole, la generazione del pattern non è concepita come un processo batch riproducibile a partire da parametri espliciti, ma come il risultato di una configurazione temporanea della UI.
+	Le prove pratiche evidenziano inoltre una forte sensibilità del pattern generato rispetto alle operazioni di manipolazione della vista. In particolare, operazioni di zoom sul modello tridimensionale producono variazioni significative nella posizione e nella dimensione degli archi generati. Poiché lo zoom dovrebbe idealmente modificare soltanto la scala di visualizzazione e non la struttura geometrica del pattern, questo comportamento suggerisce che alcune trasformazioni dipendano direttamente dallo stato della camera o da parametri derivati dalla UI piuttosto che da una configurazione geometrica esplicitamente fissata. Di conseguenza, piccoli cambiamenti nella visualizzazione possono produrre risultati sensibilmente diversi nel pattern esportato.
+	
+	\begin{figure}[]
+		\centering
+		\includegraphics[width=0.95\textwidth]{hz1.png}
+		\caption[Interfaccia grafica del programma]{Interfaccia grafica del programma \texttt{HoloZens} (\url{https://github.com/aaronse/hz-scratch-hologram}).}
+		\label{fig:hz1}
+	\end{figure}
+	
+	Durante i test è emerso inoltre che la manipolazione del modello tridimensionale tramite trascinamento del mouse risulta relativamente imprecisa. La rotazione della scena e il posizionamento della camera avvengono tramite movimenti continui dell’interfaccia grafica, rendendo difficile ottenere configurazioni di osservazione con regolazioni fini. In assenza di un sistema numerico esplicito per impostare con precisione i parametri della camera, risulta complesso riprodurre esattamente la stessa configurazione di vista in esecuzioni successive del programma.
+	Nonostante questi elementi positivi, l’analisi del codice e le prove sperimentali evidenziano limiti strutturali rilevanti. Il primo limite è dichiarato dallo stesso autore: il software è pensato per modelli tridimensionali semplici, con un numero contenuto di facce. All’aumentare della complessità della mesh, le prestazioni degradano rapidamente, in particolare nella modalità che calcola segmenti di arco su più angoli di vista. Per mantenere la reattività dell’interfaccia, alcune funzionalità vengono disattivate automaticamente durante il movimento della camera, introducendo una dipendenza marcata dallo stato corrente della UI.
+	Un secondo limite riguarda la gestione della visibilità. Il programma non utilizza un metodo robusto basato su Z-buffer o ray casting completo nello spazio tridimensionale, ma adotta una strategia euristica che suddivide gli spigoli in segmenti e valuta la visibilità testando il punto medio di ciascun segmento rispetto alle facce proiettate. 
+	In termini operativi, la procedura suddivide ciascun spigolo in più segmenti e valuta la visibilità del punto medio di ogni segmento rispetto alle facce proiettate della mesh. Se il punto medio risulta coperto da una faccia più vicina alla camera, il segmento viene considerato nascosto. Questa strategia riduce il costo computazionale rispetto a un test continuo lungo l’intero arco, ma può produrre errori quando un segmento attraversa una regione parzialmente occlusa.
+	Questa soluzione è computazionalmente più leggera, ma può produrre errori locali di occlusione, in particolare in presenza di intersezioni parziali o geometrie più articolate.
+	L’aspetto più critico emerso durante le prove riguarda la mancata coerenza tra preview ed esportazione. Gli archi visualizzati nella finestra principale vengono disegnati direttamente a schermo con una logica orientata al rendering veloce, ma non tutti vengono serializzati nel file SVG finale. L’esportazione dipende dalla modalità attiva e dalla presenza di strutture dati specifiche, con il risultato che il contenuto del file SVG può differire sensibilmente da quanto osservato in anteprima. In pratica, il programma non garantisce un comportamento di tipo WYSIWYG (What You See Is What You Get). In un contesto di fabbricazione digitale, questa discrepanza rappresenta un limite sostanziale, poiché l’utente non può avere certezza che il pattern esportato corrisponda esattamente a quello visualizzato.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=1.05\textwidth]{hz2.png}
+		\caption[Preview ed esportazione nel software HoloZens]{Confronto tra la preview visualizzata nel software \texttt{hz-scratch-hologram} (sinistra) e il file SVG esportato (destra). In alcuni casi gli archi mostrati in anteprima non vengono serializzati nel file vettoriale finale, producendo una discrepanza tra visualizzazione e risultato esportato.}
+		\label{fig:hz}
+	\end{figure}
+	
+	Dal punto di vista architetturale, questa discrepanza deriva dal fatto che il rendering a schermo e la serializzazione SVG utilizzano percorsi di codice differenti. Il rendering della preview privilegia la velocità e disegna archi direttamente sul contesto grafico della finestra, mentre l’esportazione richiede la costruzione esplicita di strutture dati rappresentanti segmenti o archi da serializzare nel file vettoriale. Quando tali strutture non sono presenti o non sono aggiornate rispetto allo stato della preview, il file esportato può contenere un insieme di elementi vettoriali diverso da quello mostrato all’utente. Questo comportamento rende difficile utilizzare l’anteprima come strumento affidabile di progettazione del pattern.
+	Durante le prove sperimentali è stato osservato che piccole variazioni nella posizione della camera o nel livello di zoom possono produrre differenze significative nel contenuto del file SVG esportato. In alcuni casi archi chiaramente visibili nella preview non compaiono nell’output vettoriale, mentre in altri casi vengono generati segmenti inattesi. Questa variabilità rende difficile prevedere con precisione il risultato finale e riduce l’affidabilità del software come strumento di progettazione per la fabbricazione.
+	
+	Ulteriori criticità riguardano la costruzione dei profili vettoriali nell’export SVG. Le coordinate vengono convertite in valori interi di pixel, e questo arrotondamento può far coincidere punti che in realtà sono leggermente distinti. Di conseguenza, segmenti separati possono risultare artificialmente collegati nel file esportato, generando linee lunghe o connessioni non intenzionali.
+	Infine, il software non supporta l’esportazione diretta in G-code. 
+	Nel repository del progetto è presente un riferimento esplicito alla scelta di non rendere disponibile questa funzionalità. L’autore del software afferma infatti che, pur avendo inizialmente iniziato a sviluppare il codice necessario per la generazione di G-code, ha preferito non includere tale possibilità per evitare possibili danni alle macchine o agli utensili utilizzati nella lavorazione. Nel README del progetto si legge infatti:
+	
+	\textit{``NOPE. Not happening, at least for now... Initially, was planning to add Export GCODE feature, even wrote the code... But I don't want bugs/misuse to cause harm to User's machine, stock or €€€ bits.''}
+	Nel codice sorgente sono comunque presenti tracce dell’implementazione prevista, che suggeriscono l’utilizzo di comandi G-code standard per la realizzazione degli archi tramite istruzioni di interpolazione circolare. Ad esempio, la sequenza prevista include un movimento rapido verso il punto iniziale dell’arco, una discesa dell’utensile e l’esecuzione dell’arco tramite un comando di tipo \texttt{G2}. Questo indica che l’autore aveva considerato la possibilità di generare direttamente traiettorie CNC, ma ha preferito non rendere disponibile la funzionalità per ragioni di sicurezza e affidabilità.
+	Sebbene l’SVG prodotto possa essere utilizzato come base per ulteriori conversioni in ambienti CAM esterni, il programma non completa la pipeline fino alla generazione di traiettorie macchina eseguibili. Questa assenza, unita alla mancata coerenza tra preview ed export, limita l’affidabilità del flusso di lavoro in un contesto orientato alla fabbricazione reale.
+	Nel complesso, \texttt{hz-scratch-hologram} rappresenta un passo avanti rispetto a soluzioni precedenti per integrazione e interattività, ma presenta compromessi significativi in termini di robustezza algoritmica, coerenza tra preview ed esportazione e riproducibilità della pipeline. Questi aspetti ne limitano l’utilizzo come strumento affidabile per una pipeline di fabbricazione digitale completamente automatizzata.
+	
+	\subsection{Limiti comuni rispetto alla fabbricazione digitale}
+	
+	L’analisi dei due progetti evidenzia alcune limitazioni ricorrenti quando si tenta di utilizzare strumenti di generazione di scratch hologram all’interno di un workflow di fabbricazione digitale. Sebbene entrambi i programmi permettano di produrre pattern grafici a partire da modelli tridimensionali, la loro architettura e le scelte implementative non sempre risultano adeguate per un processo completo che conduca in modo affidabile dal modello 3D alla produzione fisica.
+	Un primo limite riguarda l’assenza di una pipeline autonoma e riproducibile che parta direttamente da formati mesh standard e conduca fino alla generazione di traiettorie macchina. Nel caso di \texttt{ScratchHolograms}, l’intero processo dipende dall’ambiente SketchUp e da un file intermedio \texttt{.pattern}, mentre in \texttt{hz-scratch-hologram} la pipeline è integrata in un’applicazione interattiva fortemente legata allo stato della UI. In entrambi i casi risulta difficile automatizzare il processo o integrarlo in un flusso di lavoro programmabile.
+	Un secondo limite riguarda la robustezza degli algoritmi utilizzati per il trattamento della geometria e della visibilità. Alcuni passaggi sono implementati tramite euristiche relativamente semplici, pensate per mantenere tempi di calcolo ridotti su mesh di piccole dimensioni. Tuttavia, queste scelte possono introdurre errori locali di visibilità o comportamenti instabili quando la complessità del modello aumenta. Di conseguenza, l’affidabilità del risultato dipende fortemente dalla semplicità della geometria di partenza.
+	Un ulteriore aspetto critico riguarda la coerenza tra visualizzazione e risultato esportato. In particolare, come osservato nel caso di \texttt{hz-scratch-hologram}, la preview mostrata all’utente può non corrispondere esattamente al contenuto del file SVG generato. Questa discrepanza rende difficile utilizzare l’anteprima come riferimento affidabile per la fabbricazione, poiché il pattern finale può differire da quello visualizzato durante la progettazione.
+	Infine, entrambi i progetti si concentrano principalmente sulla generazione grafica del pattern, senza completare la pipeline fino alla produzione di traiettorie macchina eseguibili. L’output è tipicamente un formato vettoriale intermedio, come PDF, DXF o SVG, che richiede ulteriori passaggi di conversione in software CAM esterni per ottenere il G-code necessario alla lavorazione CNC. Questo introduce ulteriori fonti di ambiguità e possibili errori di interpretazione delle geometrie.
+	Questi limiti non riducono il valore dei progetti analizzati come strumenti di esplorazione e visualizzazione della tecnica degli scratch hologram, ma evidenziano la difficoltà di costruire una pipeline completa che colleghi in modo diretto il modello tridimensionale alla fabbricazione fisica. Tale osservazione costituisce il punto di partenza per il lavoro presentato in questa tesi.
+	
+	
 	\section{Posizionamento del presente lavoro}
 	
-	\chapter{Formalizzazione del problema}
+	L’analisi degli strumenti esistenti mostra che la generazione computazionale di scratch hologram è un problema affrontato principalmente con strumenti orientati alla visualizzazione o alla sperimentazione grafica. I progetti esaminati dimostrano la fattibilità dell’approccio, ma presentano limitazioni che rendono difficile integrarli in una pipeline di fabbricazione digitale riproducibile.
+	Il lavoro presentato in questa tesi si colloca in una posizione intermedia tra questi strumenti sperimentali e una pipeline di fabbricazione più strutturata. L’obiettivo non è proporre un nuovo modello ottico della specular holography, ma costruire una procedura computazionale chiara che renda espliciti i passaggi necessari per trasformare un modello tridimensionale in un insieme di traiettorie di incisione.
+	In particolare, il sistema sviluppato introduce alcune differenze rispetto agli strumenti analizzati. La pipeline è progettata come processo autonomo che parte direttamente da un modello STL, senza dipendere da ambienti di modellazione esterni o da file intermedi generati da software proprietari. Inoltre, la generazione delle traiettorie e la loro esportazione utilizzano lo stesso modello geometrico interno, evitando la separazione tra rendering e serializzazione che in alcuni casi può produrre discrepanze tra preview e risultato finale.
+	Un ulteriore aspetto riguarda la natura programmabile della pipeline. L’intero processo è implementato in Python come sequenza di trasformazioni geometriche esplicite sulla mesh e sui punti campionati sugli spigoli. Questa scelta rende il sistema più facilmente analizzabile, modificabile ed estendibile rispetto a soluzioni fortemente integrate nell’interfaccia grafica.
+	Il contributo del lavoro consiste quindi nella definizione e nell’implementazione di una pipeline computazionale che collega in modo diretto la rappresentazione tridimensionale di un modello alla generazione di traiettorie bidimensionali utilizzabili per l’incisione. Tale pipeline costituisce la base per le analisi e gli sviluppi presentati nei capitoli successivi.
 	
-	\section{Definizione della mesh triangolare}
-	\section{Estrazione e rappresentazione degli spigoli}
-	\section{Definizione dei parametri di vista e illuminazione}
+	
+	\chapter{Formalizzazione e progettazione della pipeline}
+	
+	\section{Rappresentazione della mesh triangolare}
+	\section{Estrazione e selezione degli spigoli}
 	\section{Modello matematico per la generazione degli archi}
-	\section{Problema della visibilità e dell’occlusione}
+	\section{Proiezione e trasformazioni di coordinate}
+	\section{Visibilità e gestione dell’occlusione}
+	\section{Architettura generale della pipeline}
 	
-	\chapter{Architettura della pipeline computazionale}
 	
-	\section{Panoramica generale del sistema}
-	\section{Caricamento e preprocessing del modello STL}
-	\section{Campionamento degli spigoli}
-	\section{Generazione delle traiettorie}
-	\section{Culling e filtraggio delle traiettorie}
-	\section{Esportazione in formato SVG}
-	\section{Generazione del G-code}
-	\section{Applicazione desktop per preview e parametrizzazione}
-	
-	\chapter{Implementazione}
+	\chapter{Implementazione e generazione del G-code}
 	
 	\section{Struttura modulare del software}
-	\section{Scelte progettuali e librerie utilizzate}
-	\section{Parametri configurabili}
-	\section{Gestione delle prestazioni computazionali}
-	\section{Problemi incontrati e soluzioni adottate}
+	\section{Campionamento e generazione delle traiettorie}
+	\section{Culling conservativo tramite Z-buffer}
+	\section{Esportazione in formato SVG}
+	\section{Conversione in G-code}
+	\section{Coerenza tra preview e fabbricazione}
 	
-	\chapter{Dal modello 3D al G-code}
 	
-	\section{Rappresentazione degli archi in ambiente CNC}
-	\section{Conversione in comandi G2/G3}
-	\section{Gestione delle unità e precisione numerica}
-	\section{Vincoli e limiti delle macchine CNC}
-	\section{Coerenza tra simulazione e fabbricazione}
+	\chapter{Validazione, limiti e sviluppi futuri}
 	
-	\chapter{Validazione e risultati}
-	
-	\section{Caso studio: modello cubico}
-	\section{Caso studio: poliedro complesso (d20)}
+	\section{Casi di studio}
 	\section{Analisi dell’influenza dei parametri}
-	\section{Valutazione qualitativa della resa visiva}
-	\section{Discussione dei risultati}
-	
-	\chapter{Limiti e sviluppi futuri}
-	
 	\section{Limiti del modello geometrico adottato}
-	\section{Miglioramento del culling tramite metodi di visibilità avanzati}
-	\section{Estensione a modelli ottici più accurati}
-	\section{Ottimizzazione dei percorsi CNC}
-	\section{Validazione sperimentale su incisione reale}
+	\section{Possibili estensioni future}
+
 	
 	\chapter{Conclusioni}
-	
-	\section{Sintesi dei risultati}
-	\section{Contributo della tesi}
-	\section{Prospettive di ricerca future}
-	
-
-	\chapter{Title of the third chapter}
-	A quotation \cite{APS1}
-	
-	A reference to a numbered formula \eqref{ps:2}
-	
-	A reference to the first section of the first chapter \ref{sec:11}
 	
 	\chapter*{Ringraziamenti}
 	
