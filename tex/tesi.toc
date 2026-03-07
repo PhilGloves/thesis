@@ -23,17 +23,17 @@
 \contentsline {section}{\numberline {4.4}Proiezione e trasformazioni di coordinate}{21}{section.4.4}%
 \contentsline {section}{\numberline {4.5}Visibilità e gestione dell’occlusione}{22}{section.4.5}%
 \contentsline {section}{\numberline {4.6}Architettura generale della pipeline}{23}{section.4.6}%
-\contentsline {chapter}{\numberline {5}Implementazione e generazione del G-code}{27}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Struttura modulare del software}{27}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Campionamento e generazione delle traiettorie}{28}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Culling conservativo tramite Z-buffer}{30}{section.5.3}%
-\contentsline {section}{\numberline {5.4}Esportazione in formato SVG}{32}{section.5.4}%
-\contentsline {section}{\numberline {5.5}Conversione in G-code}{33}{section.5.5}%
-\contentsline {section}{\numberline {5.6}Coerenza tra preview e fabbricazione}{33}{section.5.6}%
-\contentsline {chapter}{\numberline {6}Validazione, limiti e sviluppi futuri}{35}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Casi di studio}{35}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Analisi dell’influenza dei parametri}{35}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{35}{section.6.3}%
-\contentsline {section}{\numberline {6.4}Possibili estensioni future}{35}{section.6.4}%
-\contentsline {chapter}{\numberline {7}Conclusioni}{37}{chapter.7}%
-\contentsline {chapter}{References}{41}{chapter*.3}%
+\contentsline {chapter}{\numberline {5}Implementazione e generazione del G-code}{25}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Struttura modulare del software}{25}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Campionamento e generazione delle traiettorie}{26}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Culling conservativo tramite Z-buffer}{28}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Esportazione in formato SVG}{31}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Conversione in G-code}{32}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Coerenza tra preview e fabbricazione}{34}{section.5.6}%
+\contentsline {chapter}{\numberline {6}Validazione, limiti e sviluppi futuri}{37}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Casi di studio}{37}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Analisi dell’influenza dei parametri}{37}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{37}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Possibili estensioni future}{37}{section.6.4}%
+\contentsline {chapter}{\numberline {7}Conclusioni}{39}{chapter.7}%
+\contentsline {chapter}{References}{43}{chapter*.3}%

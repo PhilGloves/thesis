@@ -414,7 +414,7 @@ ItalicFont={Verdana Italic},
 	Si consideri un modello descritto da un insieme di vertici $\mathbf{X} \in \mathbb{R}^3$ espressi in un sistema di riferimento cartesiano. La configurazione di osservazione è definita da una posizione della camera $\mathbf{p_o}$ e da un punto di riferimento $\mathbf{p_r}$ verso cui la camera è orientata. A partire da tali grandezze viene costruita una base ortonormale di vista costituita da tre vettori: un asse orizzontale, un asse verticale e un asse ottico orientato dalla scena verso la camera. La trasformazione modello–vista è quindi rappresentata da una matrice omogenea che realizza una rototraslazione rigida dei punti del modello nello spazio di vista.
 	Nel sistema adottato, i punti situati di fronte alla camera risultano avere coordinata $z$ negativa nello spazio di vista. Ai fini del calcolo della profondità, viene quindi utilizzata la quantità $-z_{view}$, che assume valori positivi per i punti visibili lungo la direzione di osservazione. Questa scelta semplifica il confronto tra profondità durante le fasi di filtraggio e gestione dell’occlusione.
 	Successivamente, i punti nello spazio di vista vengono sottoposti a una trasformazione proiettiva che li mappa sul piano immagine. La proiezione è implementata tramite una matrice prospettica parametrizzata da un fattore $z_f$, che controlla il denominatore della trasformazione omogenea. Per valori elevati di $z_f$, la trasformazione tende ad approssimare una proiezione ortografica; per valori più piccoli, l’effetto prospettico risulta più marcato. Nel contesto della presente tesi si privilegia una configurazione prossima all’ortografia, in modo da ridurre deformazioni prospettiche accentuate e ottenere una corrispondenza più stabile tra modello proiettato e traiettorie generate.
-	Dopo la trasformazione prospettica, viene applicata una scalatura uniforme e una traslazione che mappano le coordinate sul dominio del piano immagine, espresso in pixel. L’asse verticale viene invertito per adeguarsi alla convenzione grafica adottata nei sistemi di rendering bidimensionale, in cui la coordinata $y$ cresce verso il basso.
+	Dopo la proiezione, una scalatura uniforme e una traslazione riportano le coordinate nel dominio del piano immagine, espresso in pixel. L’asse verticale viene invertito per adeguarsi alla convenzione grafica adottata nei sistemi di rendering bidimensionale, in cui la coordinata $y$ cresce verso il basso.
 	
 	Il risultato della pipeline di proiezione è quindi un insieme di punti espressi come triple $(x, y, d)$, dove $(x, y)$ rappresentano le coordinate sul piano immagine e $d$ rappresenta una misura di profondità derivata dalla coordinata nello spazio di vista. Tali punti costituiscono la base per la generazione delle traiettorie di incisione e per le successive operazioni di filtraggio e gestione della visibilità.
 	
@@ -422,8 +422,8 @@ ItalicFont={Verdana Italic},
 	
 	\begin{figure}[htbp]
 		\centering
-		\includegraphics[width=0.9\textwidth]{diagramma_proiezione.png}
-		\caption[Diagramma della pipeline di proiezione]{Diagramma schematico che illustra la trasformazione dei punti del modello $\mathbf{X}$ attraverso i diversi sistemi di riferimento (Mondo, Vista, Proiettato, Immagine) fino alla generazione delle triple $(x, y, d)$. Il diagramma evidenzia il calcolo della profondità $d = -z_{view}$ e l'inversione dell'asse verticale nel piano immagine.}
+		\includegraphics[width=0.9\textwidth]{diagramma_proiezione3.png}
+		\caption[Schema della proiezione 3D--2D]{Schema semplificato della pipeline di proiezione: dai punti del modello nello spazio tridimensionale alla rappresentazione nel piano immagine, con profondità associata \(d = -z_{view}\).}
 		\label{fig:pipeline_proiezione}
 	\end{figure}
 	
@@ -635,25 +635,6 @@ ItalicFont={Verdana Italic},
 		\label{fig:pipeline}
 	\end{figure}
 	
-	Per riassumere le principali fasi della pipeline computazionale, 
-	l’Algoritmo~\ref{alg:pipeline-overview} riporta la sequenza delle operazioni 
-	necessarie per generare il pattern di scratch hologram a partire da una mesh tridimensionale.
-	
-	\begin{algorithm}[htbp]
-		\caption{Generazione del pattern di scratch hologram}
-		\label{alg:pipeline-overview}
-		
-		Carica mesh triangolare da file STL\;
-		Esegui preprocessing della mesh (rimozione facce degeneri e vertici duplicati)\;
-		Costruisci l’insieme degli spigoli della mesh\;
-		Campiona punti lungo ciascun spigolo\;
-		Proietta i punti nel sistema di vista della camera\;
-		Costruisci Z-buffer della mesh proiettata\;
-		Determina la visibilità dei punti campionati\;
-		Genera archi a partire dai punti visibili\;
-		Esporta traiettorie in formato SVG o G-code\;
-		
-	\end{algorithm}
 	
 	\chapter{Implementazione e generazione del G-code}
 	
@@ -689,12 +670,12 @@ ItalicFont={Verdana Italic},
 		\caption{Campionamento uniforme di uno spigolo}
 		\label{alg:edge-sampling}
 		\KwIn{Vertici della mesh $V$, spigolo $e=(i,j)$, densità di campionamento $\rho$}
-		\KwOut{Insieme ordinato di punti campionati $P$}
+		\KwOut{Sequenza ordinata di punti campionati $P$}
 		$p_s \leftarrow V[i]$\;
 		$p_t \leftarrow V[j]$\;
 		$L \leftarrow \|p_t - p_s\|$\;
-		$N \leftarrow \max(2, \lfloor \rho \cdot L \rfloor)$\;
-		$P \leftarrow \emptyset$\;
+		$N \leftarrow \max(2, \mathrm{int}(\rho \cdot L))$\;
+		$P \leftarrow [\ ]$\;
 		\For{$k = 0$ \KwTo $N-1$}{
 			$\alpha \leftarrow \frac{k}{N-1}$\;
 			$p \leftarrow p_s + \alpha (p_t - p_s)$\;
@@ -711,12 +692,44 @@ ItalicFont={Verdana Italic},
 	Una volta costruito il Z-buffer, ogni punto campionato sugli spigoli viene a sua volta proiettato nel piano immagine e confrontato con il valore di profondità registrato nella zona corrispondente. Se il punto si trova più lontano della superficie già presente nel buffer, allora è plausibile che sia occluso e che non debba contribuire al pattern. Se invece la sua profondità è compatibile con quella memorizzata, il punto viene mantenuto.
 	Nel sistema sviluppato in questa tesi il test non viene però effettuato in modo rigido su una singola cella della griglia. La discretizzazione del piano immagine introduce inevitabilmente piccole approssimazioni numeriche: un punto vicino al contorno di una faccia potrebbe risultare leggermente spostato rispetto alla cella corretta, oppure la rasterizzazione della mesh potrebbe non catturare perfettamente geometrie sottili o regioni di bordo. Per evitare che questi effetti producano la rimozione di campioni utili, la pipeline adotta una strategia conservativa.
 	L’aggettivo \emph{conservativo} indica che, in caso di dubbio, il punto viene mantenuto anziché eliminato. In termini operativi, il confronto di profondità non viene eseguito su un solo valore del Z-buffer, ma su una piccola finestra locale attorno alla posizione proiettata del campione. Inoltre, viene introdotta una tolleranza sulla profondità, in modo da non scartare punti che risultano molto vicini alla superficie visibile. Se nella finestra locale sono presenti celle non coperte dalla mesh oppure se il campione è sufficientemente vicino alla profondità minima osservata, esso viene considerato visibile.
+	Dal punto di vista implementativo, questa procedura è realizzata costruendo dapprima un buffer di profondità della mesh proiettata e applicando successivamente, per ogni spigolo, un test di visibilità locale ai campioni ottenuti tramite campionamento uniforme nello spazio del modello.
+	\begin{algorithm}[htbp]
+		\caption{Culling conservativo dei campioni mediante Z-buffer}
+		\label{alg:conservative-zbuffer-cull}
+		\KwIn{Vertici della mesh $V$, facce triangolari $F$, spigoli $E$, configurazione camera $C$, densità di campionamento $\rho$, risoluzione del buffer $R$, finestra locale $w$}
+		\KwOut{Maschera di visibilità associata ai campioni di ciascuno spigolo}
+		
+		costruisci la matrice di proiezione a partire da $C$\;
+		proietta i vertici della mesh nel piano immagine\;
+		costruisci un Z-buffer rasterizzando le facce $F$ sulla griglia di risoluzione $R$\;
+		calcola una tolleranza di profondità $\varepsilon$\;
+		
+		\ForEach{spigolo $e \in E$}{
+			campiona uniformemente i punti di $e$ nello spazio del modello con densità $\rho$\;
+			proietta i campioni nel piano immagine\;
+			\ForEach{campione proiettato $p$}{
+				individua la finestra locale di lato $w$ centrata sulla posizione di $p$\;
+				\eIf{nella finestra esiste almeno una cella non coperta dalla mesh}{
+					marca $p$ come visibile\;
+				}{
+					sia $z_{\min}$ la minima profondità presente nella finestra\;
+					\eIf{$z(p) \leq z_{\min} + \varepsilon$}{
+						marca $p$ come visibile\;
+					}{
+						marca $p$ come non visibile\;
+					}
+				}
+			}
+		}
+		\Return{maschere di visibilità dei campioni}\;
+	\end{algorithm}
+	
 	Questa scelta è particolarmente importante per gli scratch hologram, perché i contorni visibili della forma hanno un ruolo percettivo molto forte. Un filtraggio troppo aggressivo rischierebbe di eliminare proprio quei campioni che contribuiscono maggiormente alla leggibilità del modello, soprattutto lungo silhouette, spigoli emergenti e zone di transizione tra parti visibili e nascoste. Il metodo adottato preferisce quindi mantenere qualche campione in più piuttosto che rimuovere informazioni geometriche rilevanti.
 	Dal punto di vista del risultato finale, il culling conservativo produce una maschera di visibilità associata ai punti campionati sugli spigoli. Solo i campioni che superano questo test vengono utilizzati nella fase successiva per generare gli archi. In questo modo, il pattern finale risulta più coerente con la forma osservata del modello, pur mantenendo una certa robustezza rispetto alle approssimazioni introdotte dalla discretizzazione e dalla proiezione.
 	
 	\begin{figure}[htbp]
 		\centering
-		\includegraphics[width=0.90\textwidth]{culling_example.png}
+		\includegraphics[width=0.9\textwidth]{culling_example.png}
 		\caption{Effetto del filtraggio di visibilità tramite Z-buffer: a) pattern generato senza culling; 
 			b) pattern dopo l'applicazione del test di visibilità conservativo.}
 		\label{fig:culling_example}
@@ -735,13 +748,31 @@ ItalicFont={Verdana Italic},
 	
 	\begin{figure}[htbp]
 		\centering
-		\includegraphics[width=0.95\textwidth]{svg.png}
+		\includegraphics[width=0.9\textwidth]{svg.png}
 		\caption[Preview ed esportazione SVG del pattern]{Confronto tra la preview del pattern generato nell’applicazione desktop e il corrispondente file esportato in formato SVG.}
 		\label{fig:svg}
 	\end{figure}
 	
 	\section{Conversione in G-code}
+	
+	L’ultima fase della pipeline consiste nella conversione del pattern geometrico generato in un insieme di istruzioni macchina eseguibili da un sistema CNC. A differenza dell’esportazione SVG, che conserva il pattern come rappresentazione vettoriale astratta, l’esportazione in G-code richiede di interpretare gli archi come movimenti utensile nello spazio fisico di lavoro. In questa fase il problema non è più soltanto descrivere la geometria del pattern, ma trasformarla in traiettorie compatibili con una macchina reale, con unità metriche, quote di sicurezza, velocità di avanzamento e convenzioni assiali appropriate. 
+	Nel software sviluppato in questa tesi, l’esportazione in G-code viene eseguita a partire dallo stesso insieme di archi già utilizzato per la preview interattiva e per il file SVG. Questo significa che il programma non ricostruisce una nuova geometria specifica per la fabbricazione, ma riutilizza direttamente gli oggetti \texttt{Arc} prodotti dalla pipeline corrente. L’interfaccia desktop richiama infatti la stessa procedura di calcolo della vista attiva, ottiene la lista completa degli archi visibili e la passa alla funzione \texttt{write\_gcode}. Questa scelta è importante perché riduce il rischio di discrepanze tra ciò che l’utente osserva a schermo e ciò che viene effettivamente esportato per la lavorazione. 
+	Prima della scrittura del file, gli archi vengono trasformati da coordinate grafiche in coordinate metriche. Il codice calcola anzitutto l’estensione orizzontale complessiva del pattern nello spazio della preview e la utilizza per determinare un fattore di scala espresso in millimetri per unità grafica. Tale fattore dipende dal parametro \texttt{target\_width\_mm}, richiesto all’utente nella finestra di esportazione, che definisce la larghezza finale desiderata dell’incisione. In questo modo il pattern, inizialmente espresso nello spazio dello schermo, viene ricondotto a dimensioni fisiche controllabili. Successivamente tutte le coordinate vengono traslate in modo che il pattern inizi da un’origine positiva locale, semplificando l’uso del file G-code in ambiente CNC. 
+	Un aspetto rilevante della conversione riguarda l’orientazione dell’asse verticale. Nella preview grafica il sistema di coordinate segue la convenzione tipica dei canvas bidimensionali, in cui l’asse \(y\) cresce verso il basso. In una macchina CNC, invece, è spesso più naturale o necessario utilizzare una convenzione opposta. Per questo motivo il programma chiede esplicitamente all’utente se invertire l’asse \(y\) durante l’export, e applica tale trasformazione prima della traslazione finale in coordinate macchina. Questo passaggio garantisce una migliore adattabilità del file a configurazioni CNC differenti. 
+	Dal punto di vista geometrico, il software adotta due strategie distinte. Quando la modalità di generazione è semicircolare e l’arco esportato risulta sufficientemente vicino a una circonferenza, il programma emette direttamente un’istruzione di interpolazione circolare, utilizzando i comandi G2 o G3. In questo caso vengono calcolati il punto iniziale dell’arco, il punto finale e gli offset \(I\) e \(J\) del centro rispetto al punto iniziale. Il verso orario o antiorario viene determinato a partire dal segno dello \texttt{sweep} dell’arco, con eventuale correzione dovuta all’inversione dell’asse \(y\). Questa soluzione produce file più compatti e più vicini alla geometria ideale del pattern. 
+	Quando invece l’arco non è sufficientemente circolare, oppure quando la modalità selezionata è ellittica, il programma non tenta di forzare una rappresentazione circolare esatta. In questo caso ogni arco viene prima approssimato tramite una polilinea, costruita campionando la curva con una lunghezza massima di segmento controllata dal parametro \texttt{max\_segment\_mm}. La funzione \texttt{sample\_arc\_polyline} calcola quindi una sequenza discreta di punti lungo la traiettoria, che vengono poi esportati come una successione di movimenti lineari G1. Questa scelta aumenta il numero di istruzioni, ma consente di rappresentare in modo robusto anche geometrie non compatibili con una singola interpolazione circolare. 
+	La sequenza G-code prodotta include, per ciascuna traiettoria, un movimento rapido verso il punto iniziale, una discesa dell’utensile alla quota di incisione, l’esecuzione del percorso utile e infine il ritorno alla quota di sicurezza. I parametri fondamentali di questa fase sono richiesti esplicitamente all’utente e comprendono la quota di sicurezza \texttt{safe\_z\_mm}, la quota di lavoro \texttt{cut\_z\_mm}, i feedrate in \(XY\) e in \(Z\), la velocità del mandrino e la lunghezza massima di segmentazione per l’approssimazione polilineare. Al termine dell’export, il programma restituisce anche alcune informazioni sintetiche, tra cui il numero di traiettorie scritte, il numero di segmenti prodotti e la lunghezza complessiva di taglio. 
+	È importante osservare che questa conversione non lavora direttamente sulla mesh triangolare originale, ma sul pattern di archi già generato nello spazio proiettato. In questo senso il G-code non descrive una lavorazione tridimensionale della superficie del modello, bensì la fabbricazione bidimensionale del pattern inciso derivato dalla sua proiezione. Questa distinzione è coerente con l’obiettivo della pipeline: non produrre una lavorazione volumetrica del modello 3D, ma un insieme di traiettorie sul piano capaci di restituirne una percezione tridimensionale tramite riflessione speculare. 
+	La conversione in G-code rappresenta quindi il passaggio che collega in modo più diretto la pipeline geometrica alla fabbricazione reale. La sua implementazione nel software mantiene la coerenza con la preview e con l’export SVG, ma introduce al tempo stesso i parametri necessari per adattare il pattern a un contesto CNC concreto. Per questo motivo essa costituisce non soltanto un formato di esportazione aggiuntivo, ma una parte essenziale del collegamento tra rappresentazione geometrica e produzione fisica.
+	
 	\section{Coerenza tra preview e fabbricazione}
+	
+	Uno degli aspetti più delicati in una pipeline orientata alla fabbricazione riguarda la corrispondenza tra ciò che l’utente osserva in anteprima e ciò che viene effettivamente prodotto nei file di esportazione. In molti strumenti software questa corrispondenza non è garantita, perché la preview a schermo e l’output finale sono generati attraverso percorsi distinti del codice o mediante strutture dati differenti. In tali casi, il risultato esportato può discostarsi in modo anche significativo da quanto mostrato durante la fase di progettazione.
+	Nel sistema sviluppato in questa tesi si è cercato di evitare esplicitamente questo problema. La preview interattiva, l’esportazione in SVG e la conversione in G-code condividono infatti la stessa sorgente geometrica, costituita dall’insieme degli archi generati dalla pipeline per la vista corrente. In fase di visualizzazione, tali archi vengono calcolati da \texttt{generate\_arcs} e memorizzati nella struttura \texttt{current\_arcs}; in fase di esportazione, la funzione \texttt{\_compute\_export\_view\_data()} recupera prioritariamente proprio questo insieme di archi dalla cache della preview, garantendo che il file esportato derivi dagli stessi dati mostrati all’utente. Solo in assenza di una cache valida il sistema esegue un ricalcolo completo, mantenendo comunque lo stesso percorso computazionale. 
+	Questa scelta architetturale ha una conseguenza importante: la preview non è una semplice visualizzazione approssimativa o illustrativa, ma una vera rappresentazione del pattern che verrà successivamente esportato. Nel caso dell’SVG, la funzione di export utilizza direttamente l’insieme di archi restituito dalla vista corrente e lo passa a \texttt{write\_svg}, senza introdurre trasformazioni geometriche aggiuntive indipendenti dalla preview. Analogamente, l’export G-code utilizza lo stesso insieme di archi e lo converte in traiettorie macchina mantenendo invariata la geometria del pattern, salvo le trasformazioni necessarie per passare dallo spazio grafico dello schermo allo spazio metrico della lavorazione CNC. 
+	Nel codice questa coerenza è rafforzata anche dalla gestione dello stato interattivo. Se l’utente sta manipolando il modello con una preview temporanea a bassa qualità, l’esportazione non usa tale stato provvisorio, ma forza automaticamente un aggiornamento non interattivo prima di scrivere i file. In questo modo il sistema evita che SVG o G-code vengano generati a partire da una vista transitoria calcolata con densità ridotta o con un numero limitato di archi. L’obiettivo è quindi duplice: mantenere la corrispondenza tra anteprima e output e, allo stesso tempo, assicurare che l’output finale sia costruito a partire dalla versione completa e stabile della vista corrente.
+	Anche la coerenza locale delle singole traiettorie viene preservata. La funzione \texttt{arc\_endpoints\_svg}, ad esempio, converte gli oggetti \texttt{Arc} in primitive SVG mantenendo la stessa convenzione angolare utilizzata nella preview Tkinter. Allo stesso modo, la conversione in G-code interpreta gli stessi archi come movimenti circolari o come polilinee approssimanti, senza modificarne arbitrariamente posizione o orientazione. In altri termini, SVG e G-code non sono ricostruzioni alternative del pattern, ma rappresentazioni differenti della stessa struttura geometrica interna.
+	Dal punto di vista del flusso di lavoro, questa proprietà rende l’applicazione più affidabile. L’utente può usare la preview come riferimento operativo effettivo, sapendo che le scelte relative a camera, scala, modalità di arco, rapporto ellittico e visibilità si rifletteranno nello stesso modo nei file esportati. Tale coerenza costituisce una differenza significativa rispetto a strumenti in cui rendering e serializzazione seguono percorsi separati e rappresenta uno degli elementi centrali dell’architettura proposta in questa tesi.
 	
 	
 	\chapter{Validazione, limiti e sviluppi futuri}
