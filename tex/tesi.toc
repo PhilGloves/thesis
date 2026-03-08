@@ -32,8 +32,8 @@
 \contentsline {section}{\numberline {5.6}Coerenza tra preview e fabbricazione}{34}{section.5.6}%
 \contentsline {chapter}{\numberline {6}Validazione, limiti e sviluppi futuri}{37}{chapter.6}%
 \contentsline {section}{\numberline {6.1}Casi di studio}{37}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Analisi dell’influenza dei parametri}{37}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{37}{section.6.3}%
-\contentsline {section}{\numberline {6.4}Possibili estensioni future}{37}{section.6.4}%
-\contentsline {chapter}{\numberline {7}Conclusioni}{39}{chapter.7}%
-\contentsline {chapter}{References}{43}{chapter*.3}%
+\contentsline {section}{\numberline {6.2}Effetto dei parametri sul pattern generato}{38}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{40}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Possibili estensioni future}{40}{section.6.4}%
+\contentsline {chapter}{\numberline {7}Conclusioni}{41}{chapter.7}%
+\contentsline {chapter}{References}{45}{chapter*.3}%

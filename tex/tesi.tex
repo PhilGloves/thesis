@@ -778,7 +778,61 @@ ItalicFont={Verdana Italic},
 	\chapter{Validazione, limiti e sviluppi futuri}
 	
 	\section{Casi di studio}
-	\section{Analisi dell’influenza dei parametri}
+	La validazione della pipeline è stata condotta su due modelli geometrici con caratteristiche differenti: un cubo e un d20\footnote{Dado a 20 facce, geometricamente corrispondente a un icosaedro regolare.} privo di numerazione sulle facce. La scelta di questi due casi di studio risponde all’esigenza di osservare il comportamento del sistema sia in una configurazione semplice e facilmente interpretabile, sia in una situazione più articolata, caratterizzata da un numero maggiore di spigoli e da una più elevata densità di traiettorie generate.
+	Il cubo costituisce il caso di studio più elementare. La sua geometria è regolare, il numero di spigoli è ridotto e la struttura complessiva del pattern risultante è facilmente leggibile anche in preview. Con una \emph{line resolution}\footnote{Parametro che controlla la densità di campionamento lungo gli spigoli della mesh} pari a 3.28 (valore di default quando si apre il programma), la pipeline genera in questo caso un numero di archi dell’ordine di 300--400. Questo modello è stato utilizzato principalmente per verificare la correttezza dell’intero flusso di lavoro: coerenza tra preview e file SVG esportato, importazione dell’SVG in Blender per la simulazione della visibilità e verifica qualitativa del comportamento del pattern rispetto alla forma tridimensionale di partenza. Il cubo si è rivelato particolarmente utile anche per controllare la stabilità della pipeline, poiché eventuali incoerenze geometriche o problemi di esportazione risultano immediatamente evidenti su una forma così semplice.
+	Il secondo caso di studio è costituito da un d20 privo di numerazione sulle facce. Rispetto al cubo, questo modello introduce una geometria più complessa, con una distribuzione molto più ricca di spigoli e una maggiore densità di campionamento. A parità di \emph{line resolution}, il numero di archi generati cresce fino a circa 1200, riducendosi a circa 750 quando il culling di visibilità è attivo. Questo caso di studio è stato utilizzato per osservare il comportamento della pipeline in presenza di una mesh più articolata, verificando se la generazione delle traiettorie, il filtraggio della visibilità e l’esportazione del pattern restassero coerenti anche in condizioni meno banali.
+	Per entrambi i modelli, la validazione è stata svolta confrontando tre rappresentazioni dello stesso risultato: la preview generata nell’applicazione desktop, il file SVG esportato dalla pipeline e la simulazione in Blender ottenuta importando il pattern vettoriale. L’obiettivo non era dimostrare la correttezza fisica completa del fenomeno ottico, ma verificare la coerenza interna della pipeline, cioè il fatto che il pattern visualizzato a schermo fosse lo stesso effettivamente esportato e che tale pattern producesse, in simulazione, un comportamento qualitativamente compatibile con la forma del modello di partenza.
+	Per quanto riguarda il G-code, non è stata possibile una validazione su macchina reale, poiché al momento dello svolgimento del lavoro non era disponibile un sistema CNC per l’incisione. La verifica è stata quindi limitata a un controllo in ambiente di simulazione, confrontando il toolpath generato con il corrispondente pattern SVG. Anche in questo caso l’obiettivo era accertare la coerenza geometrica dell’output, cioè verificare che i tagli descritti dal G-code corrispondessero alle traiettorie previste dalla pipeline.
+	Accanto ai due casi di studio principali sono emerse anche osservazioni utili sul comportamento del sistema al crescere della complessità della mesh. In particolare, modelli più ricchi di dettagli producono un numero di archi molto elevato e possono mettere in difficoltà la preview interattiva. Un d20 con facce numerate, ad esempio, arriva a circa 15000 archi senza culling e circa 5000 con culling attivo, con un impatto evidente sulla reattività dell’applicazione. Analogamente, un modello di tipo trefoil ha prodotto circa 8300 archi, ridotti a circa 2600 con culling attivo; in questo caso è emersa l’ipotesi che il filtraggio della visibilità possa risultare talvolta troppo aggressivo, lasciando alcune porzioni della mesh non adeguatamente coperte da traiettorie. Tali osservazioni non sono state assunte come casi di studio completi, ma costituiscono un’indicazione utile dei limiti attuali della pipeline in presenza di modelli più complessi.
+	Nel complesso, i due casi di studio principali mostrano che la pipeline funziona in modo coerente per geometrie semplici e moderatamente complesse, mantenendo l’allineamento tra preview, esportazione SVG e simulazione del risultato. Le osservazioni aggiuntive su modelli più densi evidenziano invece come la complessità geometrica influenzi direttamente il numero di archi prodotti, le prestazioni della preview e l’efficacia del culling di visibilità.
+	
+	\section{Effetto dei parametri sul pattern generato}
+	
+	Il comportamento della pipeline dipende in modo significativo da alcuni parametri di controllo, che influenzano direttamente il numero di campioni generati sugli spigoli, la densità complessiva del pattern, la leggibilità della preview e il costo computazionale della generazione. Tra questi, il parametro più importante è \texttt{line\_resolution}, indicato nel codice come densità di campionamento degli spigoli espressa in campioni per unità di lunghezza del modello. Tale parametro viene propagato nella pipeline come \texttt{view\_points\_per\_unit\_length} ed è utilizzato sia nella generazione degli archi sia nella costruzione della mappa di visibilità. 
+	Dal punto di vista matematico, la legge di campionamento implementata è molto semplice. Se uno spigolo della mesh ha estremi \(p_s\) e \(p_t\), la sua lunghezza nello spazio del modello è data da
+	\[
+	L = \|p_t - p_s\|.
+	\]
+	Fissata una densità di campionamento \(\rho\), corrispondente al parametro \texttt{line\_resolution}, il numero di campioni associati allo spigolo viene calcolato come
+	\[
+	N = \max\left(2,\left\lfloor \rho \cdot L \right\rfloor\right).
+	\]
+	In questo modo il numero di punti cresce proporzionalmente alla lunghezza geometrica dello spigolo: spigoli più lunghi producono più campioni, mentre per gli spigoli molto corti viene comunque garantita la presenza di almeno due punti. Questa è esattamente la legge utilizzata nella funzione \texttt{sample\_edge\_model\_points}, dove il codice calcola la lunghezza del segmento e determina il numero di punti come \texttt{max(2, int(view\_points\_per\_unit\_length * length\_model))}. 
+	
+	Una volta determinato \(N\), i campioni vengono distribuiti uniformemente lungo lo spigolo mediante un parametro scalare \(t \in [0,1]\). Se si indica con
+	\[
+	t_k = \frac{k}{N-1}, \qquad k = 0,\dots,N-1,
+	\]
+	il generico punto campionato è ottenuto per interpolazione lineare:
+	\[
+	p_k = p_s + t_k (p_t - p_s).
+	\]
+	Questa scelta produce un campionamento uniforme nello spazio del modello e non nello spazio proiettato. Il codice esplicita che tale strategia è preferita perché mantiene coerenti campionamento, proiezione, visibilità e generazione degli archi, anche se può risultare meno adattiva in presenza di forti effetti di accorciamento prospettico. 
+	L’effetto immediato di un aumento di \texttt{line\_resolution} è quindi un incremento del numero di campioni lungo ciascuno spigolo e, di conseguenza, un aumento del numero di archi generati nel pattern finale. Poiché la funzione \texttt{generate\_arcs} costruisce gli archi proprio a partire dai campioni ottenuti sugli spigoli, il parametro agisce direttamente sulla densità del pattern. A valori bassi di \texttt{line\_resolution} il pattern risulta più rado e meno costoso da calcolare, ma può perdere continuità visiva e copertura della forma; a valori più alti il pattern diventa più fitto e leggibile, ma cresce rapidamente anche il costo computazionale della preview e delle successive fasi di filtraggio della visibilità. 
+	Nel caso dei test svolti in questa tesi, una \texttt{line\_resolution} pari a 3.28 ha rappresentato un compromesso ragionevole tra qualità del pattern e costo computazionale. Con tale valore, un modello semplice come il cubo genera un numero di archi dell’ordine di alcune centinaia, mentre modelli più complessi come il d20 o il trefoil producono migliaia di traiettorie, con un impatto evidente sulla reattività della preview. L’aumento della densità di campionamento non influisce quindi soltanto sull’aspetto del pattern, ma anche sulla scalabilità pratica della pipeline.
+	Un secondo parametro rilevante è l’attivazione del culling di visibilità. 
+	\begin{table}[htbp]
+		\centering
+		\caption[Numero di archi in funzione della line resolution]{Numero di archi generati dal modello cubico al variare del parametro \texttt{line\_resolution}, con e senza culling di visibilità.}
+		\label{tab:line-resolution-cube}
+		\begin{tabular}{ccc}
+			\toprule
+			\texttt{line\_resolution} & Archi senza culling & Archi con culling \\
+			\midrule
+			1.5  & 152 & 115 \\
+			3.28 & 368 & 277 \\
+			6.0  & 704 & 530 \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	La Tabella~\ref{tab:line-resolution-cube} mostra chiaramente come l’aumento di \texttt{line\_resolution} produca una crescita quasi proporzionale del numero di archi generati, mentre l’attivazione del culling riduce in modo sistematico il numero finale di traiettorie mantenute.
+	
+	A parità di \texttt{line\_resolution}, l’uso del filtro basato su Z-buffer può ridurre in modo consistente il numero di archi effettivamente mantenuti, poiché elimina i campioni che risultano occlusi rispetto alla configurazione di vista corrente. Questo effetto è particolarmente evidente nei modelli più complessi, in cui molte porzioni degli spigoli proiettati ricadono dietro facce più vicine alla camera. Il parametro non modifica quindi la legge di campionamento in sé, ma agisce sul numero finale di traiettorie visibili che contribuiscono al pattern. 
+	Anche la modalità di generazione dell’arco influenza l’aspetto del risultato. Nel codice sono previste due modalità principali, \texttt{semi} ed \texttt{elliptic}. 
+	Nel primo caso ogni campione genera un arco semicircolare con sweep fissato a \(180^\circ\); nel secondo caso la geometria viene deformata verticalmente tramite il parametro \texttt{ellipse\_ratio}, modificando il rapporto tra larghezza e altezza del rettangolo di bounding box. Questo permette di controllare la forma locale delle incisioni senza alterare il principio generale di campionamento degli spigoli. 
+	L’introduzione della modalità \texttt{elliptic} nasce dall’idea di esplorare una variante più morbida rispetto all’arco semicircolare classico. In termini qualitativi, un arco ellittico con rapporto verticale ridotto dovrebbe produrre una variazione più graduale della posizione apparente dei riflessi al variare dell’orientazione del piano o della direzione della luce. Rispetto al caso semicircolare, in cui la traiettoria del riflesso cambia più rapidamente, la modalità ellittica è stata quindi pensata come possibile soluzione per ottenere un comportamento ottico più “gentile” o meno brusco. È importante osservare che questa scelta, pur essendo implementata nella pipeline, non è stata validata sperimentalmente nel corso del presente lavoro e deve quindi essere interpretata come un’estensione esplorativa del modello, più che come un risultato già verificato.
+	I parametri della pipeline, quindi, agiscono a livelli diversi ma strettamente collegati. \texttt{line\_resolution} controlla la densità di campionamento degli spigoli e quindi la quantità di informazione geometrica che viene trasferita nel pattern; il culling di visibilità determina quali tra questi campioni contribuiscano effettivamente al risultato finale; i parametri di generazione degli archi, infine, influenzano la forma grafica delle traiettorie prodotte. L’analisi congiunta di questi fattori è quindi essenziale per individuare un compromesso efficace tra qualità visiva, coerenza geometrica e costo computazionale.
+	
 	\section{Limiti del modello geometrico adottato}
 	\section{Possibili estensioni future}
 

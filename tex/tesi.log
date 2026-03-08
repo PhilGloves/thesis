@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  7 MAR 2026 20:01
+This is LuaHBTeX, Version 1.24.0 (MiKTeX 26.2) (format=lualatex 2026.3.2)  8 MAR 2026 11:59
  restricted system commands enabled.
 **tesi.tex
 (./tesi.tex
@@ -1523,15 +1523,23 @@ warning  (pdf backend): ignoring duplicate destination with the name 'figure.5.3
 
 ]
 Capitolo 6.
-[37] [38
+[37] [38]
+Underfull \hbox (badness 3364) in paragraph at lines 816--816
+[]\TU/lmr/m/n/10.95 Ta-bel-la 6.1: []Numero di ar-chi ge-ne-ra-ti dal mo-del-lo cu-bi-co al va-ria-re del pa-ra-me-tro
+ []
 
-]
+[39
+warning  (pdf backend): ignoring duplicate destination with the name 'table.6.1'
+
+] [40]
 Capitolo 7.
-[39] [40
+[41
 
-] [41] [42
+] [42
 
-] [43
+] [43] [44
+
+] [45
 
 
 ] (./tesi.aux)
@@ -1540,20 +1548,24 @@ LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
 Package rerunfilecheck Info: File `tesi.out' has not changed.
-(rerunfilecheck)             Checksum: E963951534EE7F440987F1291F53C398;8338.
+(rerunfilecheck)             Checksum: 1157236D39C5229F95CA8FC72FCC3B75;8371.
 )
 
 Here is how much of LuaTeX's memory you used:
- 33852 strings out of 476076
+ 33864 strings out of 476076
  156274,1144653 words of node,token memory allocated
- 804 words of node memory still in use:
-   7 hlist, 2 vlist, 2 rule, 10 glue, 4 kern, 4 glyph, 42 attribute, 75 glue_spe
-c, 22 attribute_list, 2 write, 2 pdf_action nodes
-   avail lists: 1:2,2:946,3:285,4:92,5:656,6:81,7:14924,8:46,9:434,10:44,11:2333
+ 848 words of node memory still in use:
+   7 hlist, 2 vlist, 2 rule, 12 glue, 4 kern, 4 glyph, 52 attribute, 75 glue_spe
+c, 27 attribute_list, 2 write, 2 pdf_action nodes
+   avail lists: 1:2,2:931,3:285,4:92,5:656,6:81,7:14922,8:46,9:434,10:44,11:2333
 
- 55350 multiletter control sequences out of 65536+600000
+ 55357 multiletter control sequences out of 65536+600000
  116 fonts using 18356927 bytes
  98i,20n,104p,1466b,547s stack positions out of 10000i,1000n,20000p,200000b,200000s
+
+warning  (pdf backend): unreferenced destination with name 'Hfootnote.6'
+
+warning  (pdf backend): unreferenced destination with name 'Hfootnote.5'
 
 warning  (pdf backend): unreferenced destination with name 'Hfootnote.4'
 
@@ -1583,9 +1595,9 @@ s/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Program Files/MiKTeX/fonts/type1/p
 ublic/lm/lmmi8.pfb><C:/Program Files/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/
 Program Files/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Program Files/MiKTeX/fon
 ts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on tesi.pdf (51 pages, 5200926 bytes).
+Output written on tesi.pdf (53 pages, 5219939 bytes).
 
-PDF statistics: 621 PDF objects out of 1000 (max. 8388607)
- 113 named destinations out of 1000 (max. 1048576)
+PDF statistics: 637 PDF objects out of 1000 (max. 8388607)
+ 118 named destinations out of 1000 (max. 1048576)
  312 words of extra memory for PDF output out of 10000 (max. 100000000)
 
