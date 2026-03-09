@@ -1,22 +1,23 @@
+from pathlib import Path
 from PIL import Image
-import os
 
-input_folder = r"C:\Users\filip\Documents\thesis\Blender\renders_test10"
-output_gif = r"C:\Users\filip\Documents\thesis\Blender\hologram.gif"
+input_folder = Path.cwd()
+output_gif = input_folder / f"{input_folder.name}.gif"
 
-images = []
+files = sorted(input_folder.glob("*.png"))
 
-files = sorted([f for f in os.listdir(input_folder) if f.endswith(".png")])
+if not files:
+    raise FileNotFoundError(f"Nessun PNG trovato in: {input_folder}")
 
-for f in files:
-    img = Image.open(os.path.join(input_folder, f))
-    images.append(img)
+forward_images = [Image.open(file).copy() for file in files]
+backward_images = forward_images[-2:0:-1]
+all_images = forward_images + backward_images
 
-images[0].save(
+all_images[0].save(
     output_gif,
     save_all=True,
-    append_images=images[1:],
-    duration=80,  # ms per frame
+    append_images=all_images[1:],
+    duration=80,
     loop=0
 )
 
