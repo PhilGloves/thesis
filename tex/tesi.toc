@@ -18,8 +18,8 @@
 \contentsline {section}{\numberline {3.3}Posizionamento del presente lavoro}{16}{section.3.3}%
 \contentsline {chapter}{\numberline {4}Formalizzazione e progettazione della pipeline}{19}{chapter.4}%
 \contentsline {section}{\numberline {4.1}Rappresentazione della mesh triangolare}{19}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Estrazione e selezione degli spigoli}{20}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Modello matematico per la generazione degli archi}{21}{section.4.3}%
+\contentsline {section}{\numberline {4.2}Estrazione e selezione degli spigoli}{19}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Modello matematico per la generazione degli archi}{20}{section.4.3}%
 \contentsline {section}{\numberline {4.4}Proiezione e trasformazioni di coordinate}{21}{section.4.4}%
 \contentsline {section}{\numberline {4.5}Visibilità e gestione dell’occlusione}{22}{section.4.5}%
 \contentsline {section}{\numberline {4.6}Architettura generale della pipeline}{23}{section.4.6}%
@@ -28,19 +28,19 @@
 \contentsline {section}{\numberline {5.2}Campionamento e generazione delle traiettorie}{27}{section.5.2}%
 \contentsline {section}{\numberline {5.3}Culling conservativo tramite Z-buffer}{28}{section.5.3}%
 \contentsline {section}{\numberline {5.4}Esportazione in formato SVG}{30}{section.5.4}%
-\contentsline {section}{\numberline {5.5}Conversione in G-code}{31}{section.5.5}%
-\contentsline {section}{\numberline {5.6}Coerenza tra preview e fabbricazione}{34}{section.5.6}%
-\contentsline {chapter}{\numberline {6}Validazione, limiti e sviluppi futuri}{37}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Casi di studio}{37}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Effetto dei parametri sul pattern generato}{39}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{43}{section.6.3}%
-\contentsline {section}{\numberline {6.4}Possibili estensioni future}{45}{section.6.4}%
-\contentsline {chapter}{\numberline {7}Conclusioni}{47}{chapter.7}%
-\contentsline {chapter}{\numberline {A}Setup sperimentale e replicabilità}{49}{appendix.Alph1}%
-\contentsline {section}{\numberline {A.1}Ambiente software}{49}{section.Alph1.1}%
-\contentsline {section}{\numberline {A.2}Parametri principali della pipeline}{49}{section.Alph1.2}%
-\contentsline {section}{\numberline {A.3}Procedura di generazione ed esportazione}{50}{section.Alph1.3}%
-\contentsline {section}{\numberline {A.4}Setup di Blender}{51}{section.Alph1.4}%
-\contentsline {section}{\numberline {A.5}Setup di CutViewer}{51}{section.Alph1.5}%
-\contentsline {section}{\numberline {A.6}Casi di studio e quantità di archi generate}{52}{section.Alph1.6}%
-\contentsline {chapter}{References}{53}{table.Alph1.3}%
+\contentsline {section}{\numberline {5.5}Conversione in G-code}{32}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Coerenza tra preview e fabbricazione}{33}{section.5.6}%
+\contentsline {chapter}{\numberline {6}Validazione, limiti e sviluppi futuri}{35}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Casi di studio}{35}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Effetto dei parametri sul pattern generato}{37}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Limiti del modello geometrico adottato}{41}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Possibili estensioni future}{43}{section.6.4}%
+\contentsline {chapter}{\numberline {7}Conclusioni}{45}{chapter.7}%
+\contentsline {chapter}{\numberline {A}Setup sperimentale e replicabilità}{47}{appendix.Alph1}%
+\contentsline {section}{\numberline {A.1}Ambiente software}{47}{section.Alph1.1}%
+\contentsline {section}{\numberline {A.2}Parametri principali della pipeline}{47}{section.Alph1.2}%
+\contentsline {section}{\numberline {A.3}Procedura di generazione ed esportazione}{48}{section.Alph1.3}%
+\contentsline {section}{\numberline {A.4}Setup di Blender}{49}{section.Alph1.4}%
+\contentsline {section}{\numberline {A.5}Setup di CutViewer}{50}{section.Alph1.5}%
+\contentsline {section}{\numberline {A.6}Casi di studio e quantità di archi generate}{50}{section.Alph1.6}%
+\contentsline {chapter}{Bibliografia}{51}{table.Alph1.3}%
