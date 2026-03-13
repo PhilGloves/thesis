@@ -303,11 +303,10 @@ def write_gcode(
         return (x_u * mm_per_unit) - min_x_mm, (y_src * mm_per_unit) - min_y_mm
 
     gcode_lines = [
-        "; ScratchHologram Generator - G-code",
-        "G21 ; millimeters",
-        "G90 ; absolute coordinates",
-        "G17 ; XY plane",
-        "G94 ; units/min feed",
+        "G21",
+        "G90",
+        "G17",
+        "G94",
         f"G0 Z{safe_z_mm:.4f}",
     ]
     if spindle_rpm > 0:
@@ -384,6 +383,51 @@ def write_gcode(
     gcode_path.parent.mkdir(parents=True, exist_ok=True)
     gcode_path.write_text("\n".join(gcode_lines), encoding="utf-8")
     return path_count, segment_count, total_cut_length
+
+
+def estimate_gcode_footprint_mm(arcs: list[Arc], target_width_mm: float) -> tuple[float, float]:
+    """
+    Estimate the planar G-code envelope for a scaled arc set.
+
+    Parameters
+    ----------
+    arcs : list[Arc]
+        Screen-space arcs selected for export.
+    target_width_mm : float
+        Requested output width in millimeters.
+
+    Returns
+    -------
+    tuple[float, float]
+        Estimated `(width_mm, height_mm)` envelope after scaling.
+
+    Notes
+    -----
+    The estimate uses the union of arc bounding boxes in screen space. This is
+    conservative: the returned envelope may be slightly larger than the true
+    toolpath extent, but it is stable and fast enough for interactive export
+    prompts.
+
+    Assumptions
+    -----------
+    `arcs` is non-empty and uses the same screen-space convention as SVG and
+    G-code export.
+    """
+
+    if len(arcs) == 0:
+        raise ValueError("Nessun arco disponibile per stimare l'ingombro.")
+    if target_width_mm <= 0.0:
+        raise ValueError("target_width_mm deve essere > 0.")
+
+    min_x_u = min(float(a.rect_x) for a in arcs)
+    max_x_u = max(float(a.rect_x + a.rect_w) for a in arcs)
+    min_y_u = min(float(a.rect_y) for a in arcs)
+    max_y_u = max(float(a.rect_y + a.rect_h) for a in arcs)
+
+    width_u = max(max_x_u - min_x_u, EPS)
+    height_u = max(max_y_u - min_y_u, EPS)
+    mm_per_unit = target_width_mm / width_u
+    return float(target_width_mm), float(height_u * mm_per_unit)
 
 
 class ScratchDesktopApp:
@@ -487,12 +531,12 @@ class ScratchDesktopApp:
         self.visibility_cull = tk.BooleanVar(value=False)
 
         self.gcode_target_width_mm = 10.0
-        self.gcode_safe_z_mm = 3.0
-        self.gcode_cut_z_mm = -0.08
-        self.gcode_feed_xy_mm_min = 700.0
-        self.gcode_feed_z_mm_min = 220.0
+        self.gcode_safe_z_mm = 5.0
+        self.gcode_cut_z_mm = -0.02
+        self.gcode_feed_xy_mm_min = 400.0
+        self.gcode_feed_z_mm_min = 120.0
         self.gcode_max_segment_mm = 0.20
-        self.gcode_spindle_rpm = 12000
+        self.gcode_spindle_rpm = 1000
         self.gcode_invert_y = True
 
         self.status_var = tk.StringVar(value="Apri un file STL per iniziare.")
@@ -1336,12 +1380,29 @@ class ScratchDesktopApp:
         )
         return sample_visibility_by_edge
 
-    def _prompt_gcode_settings(self) -> dict[str, float | int | bool] | None:
+    def _prompt_gcode_settings(self, arcs: list[Arc] | None = None) -> dict[str, float | int | bool] | None:
         parent = self.root
+        scale_prompt = (
+            "Larghezza finale incisione (mm):\n"
+            "Il pattern viene scalato in proporzione."
+        )
+        if arcs:
+            try:
+                est_w_mm, est_h_mm = estimate_gcode_footprint_mm(
+                    arcs,
+                    float(self.gcode_target_width_mm),
+                )
+                scale_prompt = (
+                    "Larghezza finale incisione (mm):\n"
+                    f"Ingombrio stimato con il valore corrente: {est_w_mm:.1f} x {est_h_mm:.1f} mm.\n"
+                    "Su una piastra 200x200 mm, 180-190 mm lascia un margine utile."
+                )
+            except ValueError:
+                pass
 
         target_width_mm = simpledialog.askfloat(
             "G-code: scala",
-            "Larghezza finale incisione (mm):",
+            scale_prompt,
             parent=parent,
             initialvalue=float(self.gcode_target_width_mm),
             minvalue=0.1,
@@ -1351,7 +1412,7 @@ class ScratchDesktopApp:
 
         safe_z_mm = simpledialog.askfloat(
             "G-code: sicurezza",
-            "Quota Z di sicurezza (mm):",
+            "Quota Z di sicurezza (mm):\nAumentala se morsetti o staffe sporgono sopra il piano.",
             parent=parent,
             initialvalue=float(self.gcode_safe_z_mm),
         )
@@ -1360,7 +1421,7 @@ class ScratchDesktopApp:
 
         cut_z_mm = simpledialog.askfloat(
             "G-code: incisione",
-            "Quota Z di incisione (mm):",
+            "Quota Z di incisione (mm, negativa):\nPer i primi test con punta diamantata prova -0.01 / -0.02.",
             parent=parent,
             initialvalue=float(self.gcode_cut_z_mm),
         )
@@ -1369,7 +1430,7 @@ class ScratchDesktopApp:
 
         feed_xy_mm_min = simpledialog.askfloat(
             "G-code: feed XY",
-            "Feed XY (mm/min):",
+            "Feed XY (mm/min):\nTienilo sotto il limite massimo configurato in GRBL.",
             parent=parent,
             initialvalue=float(self.gcode_feed_xy_mm_min),
             minvalue=1.0,
@@ -1379,7 +1440,7 @@ class ScratchDesktopApp:
 
         feed_z_mm_min = simpledialog.askfloat(
             "G-code: feed Z",
-            "Feed Z (mm/min):",
+            "Feed Z (mm/min):\nValori prudenti riducono il rischio di incidere troppo.",
             parent=parent,
             initialvalue=float(self.gcode_feed_z_mm_min),
             minvalue=1.0,
@@ -1399,7 +1460,7 @@ class ScratchDesktopApp:
 
         spindle_rpm = simpledialog.askinteger(
             "G-code: mandrino",
-            "RPM mandrino (0 = non emettere M3/M5):",
+            "RPM mandrino (0 = non emettere M3/M5):\n1000 e' un punto di partenza prudente se vuoi tenerlo acceso.",
             parent=parent,
             initialvalue=int(self.gcode_spindle_rpm),
             minvalue=0,
@@ -1534,7 +1595,7 @@ class ScratchDesktopApp:
             messagebox.showwarning("Nessun arco", "Con i parametri attuali non ci sono archi da esportare.")
             return
 
-        params = self._prompt_gcode_settings()
+        params = self._prompt_gcode_settings(arcs_export)
         if params is None:
             return
 
@@ -1554,6 +1615,10 @@ class ScratchDesktopApp:
             return
 
         try:
+            env_w_mm, env_h_mm = estimate_gcode_footprint_mm(
+                arcs_export,
+                float(params["target_width_mm"]),
+            )
             path_count, segment_count, cut_length = write_gcode(
                 gcode_path=Path(save_path),
                 arcs=arcs_export,
@@ -1575,6 +1640,7 @@ class ScratchDesktopApp:
             (
                 f"G-code esportato: {save_path} | Archi visibili: {len(arcs_export)}"
                 f"/{len(arcs_full)} | "
+                f"Ingombro: {env_w_mm:.1f} x {env_h_mm:.1f} mm | "
                 f"Path: {path_count} | Segmenti: {segment_count} | "
                 f"Lunghezza taglio: {cut_length:.2f} mm | Source: {source.upper()}"
             )

@@ -1,0 +1,140 @@
+Certo — ti lascio una traccia **naturale, parlata**, pensata per **circa 15 minuti** su **10 slide**. Non è da imparare a memoria parola per parola: usala come base, poi la rendi tua con il tuo ritmo.
+
+## Slide 1 — Titolo
+
+**Tempo:** 40–50 secondi
+
+“Buongiorno a tutti, sono [NOME COGNOME] e oggi vi presento il mio lavoro di tesi triennale in Informatica, intitolato *Pipeline computazionale per la fabbricazione digitale di scratch hologram: dal modello 3D al G-Code*.
+
+L’idea di partenza della tesi è studiare come sia possibile partire da un modello 3D, in particolare una mesh STL, e trasformarlo in un insieme di traiettorie bidimensionali adatte alla generazione di uno scratch hologram. Il lavoro si colloca quindi tra geometria computazionale, rappresentazione grafica e preparazione alla fabbricazione digitale.”
+
+## Slide 2 — Contesto e motivazione
+
+**Tempo:** 1 minuto e 15
+
+“Prima di entrare nel dettaglio, spiego molto brevemente il contesto.
+
+Gli scratch hologram sono una tecnica analogica che permette di suggerire una percezione tridimensionale attraverso incisioni su una superficie riflettente. Dal punto di vista informatico, la parte interessante è che bisogna tradurre una geometria 3D in un pattern 2D che mantenga una relazione leggibile con il modello di partenza.
+
+Il problema quindi non è semplicemente visualizzare un oggetto, ma costruire una pipeline che trasformi una mesh triangolare in curve incise, mantenendo controllo sui parametri geometrici, sulla vista e sulla leggibilità del risultato.
+
+Mi interessava soprattutto questo aspetto: rendere esplicito e analizzabile il passaggio dal modello tridimensionale a un pattern bidimensionale esportabile.”
+
+## Slide 3 — Obiettivo della tesi
+
+**Tempo:** 1 minuto
+
+“L’obiettivo del lavoro non era sviluppare un modello fisico completo della riflessione luminosa, che sarebbe stato molto più ampio e complesso, ma definire una pipeline software chiara, modulare e riproducibile.
+
+In particolare, volevo ottenere tre risultati.
+
+Il primo era caricare un modello STL e ricavarne una rappresentazione utilizzabile dal punto di vista geometrico.
+
+Il secondo era generare, a partire da quel modello, un pattern di archi nel piano, controllabile tramite parametri di vista e di campionamento.
+
+Il terzo era esportare questo pattern in formati utili, cioè SVG per la verifica vettoriale e G-code come possibile output per una lavorazione CNC, anche se quest’ultima parte è rimasta soprattutto a livello di simulazione e non di test fisico.”
+
+## Slide 4 — Struttura generale della pipeline
+
+**Tempo:** 1 minuto e 30
+
+“Questa slide riassume la pipeline complessiva.
+
+Si parte dal caricamento della mesh triangolare in formato STL. Da questa mesh vengono ricavati gli elementi geometrici rilevanti, in particolare gli spigoli. Successivamente questi elementi vengono campionati, proiettati rispetto a una certa configurazione di vista e filtrati in base alla visibilità.
+
+A quel punto il sistema genera un insieme di archi nel piano bidimensionale, che costituiscono il pattern dello scratch hologram. Da questo pattern si passa poi alla preview interattiva e all’esportazione.
+
+Il punto importante è che non si tratta di una semplice catena di conversioni automatiche, ma di una pipeline in cui ogni fase influenza la successiva: la qualità del campionamento, la scelta della vista e il filtraggio di visibilità cambiano in modo sensibile il risultato finale.”
+
+## Slide 5 — Rappresentazione della mesh e selezione degli spigoli
+
+**Tempo:** 1 minuto e 30
+
+“Dal punto di vista geometrico, il modello di input è una mesh triangolare. Questo significa che l’oggetto è descritto come un insieme di triangoli, e non come una superficie continua già pronta all’uso.
+
+Una delle prime operazioni è quindi la ricostruzione di una struttura coerente della mesh a partire dal file STL. In particolare, è necessario identificare i vertici, le facce e gli spigoli utili per le elaborazioni successive.
+
+Nel mio approccio, la mesh non viene trattata come qualcosa da incidere interamente, ma come una sorgente di informazione geometrica da cui estrarre elementi significativi. Gli spigoli sono particolarmente utili perché descrivono bene variazioni locali della forma e permettono di costruire un pattern discreto, che poi viene trasformato in traiettorie di incisione.
+
+Questa scelta semplifica il problema e rende la pipeline più controllabile.”
+
+## Slide 6 — Proiezione, visibilità e culling
+
+**Tempo:** 2 minuti
+
+“Una volta ottenuti gli elementi geometrici da trattare, bisogna portarli nel piano immagine.
+
+La pipeline definisce una configurazione di vista e proietta i punti campionati dalla mesh sul piano. Però non tutti i punti proiettati devono contribuire al pattern finale, perché alcuni possono risultare nascosti rispetto alla vista scelta.
+
+Per affrontare questo problema ho utilizzato un filtraggio di visibilità di tipo conservativo, basato su Z-buffer. In pratica, il sistema confronta la profondità dei campioni con una rappresentazione della profondità della mesh proiettata e scarta quelli che risultano occlusi.
+
+Questa fase è importante perché evita di generare un pattern troppo rumoroso o poco leggibile. Allo stesso tempo, trattandosi di un approccio conservativo, l’obiettivo non è ottenere una visibilità perfetta in senso fisico, ma un compromesso robusto e coerente con il resto della pipeline.
+
+Direi che questo è uno dei punti in cui il lavoro è stato più delicato, perché piccole variazioni nei parametri possono produrre differenze evidenti nel pattern.”
+
+## Slide 7 — Generazione degli archi e preview
+
+**Tempo:** 1 minuto e 30
+
+“A partire dai punti ritenuti validi, la pipeline genera le traiettorie elementari del pattern, che nel mio caso sono rappresentate come archi nel piano.
+
+Questa scelta permette di ottenere curve regolari, compatte e adatte sia alla visualizzazione sia all’esportazione. A livello software, il sistema consente una preview interattiva del pattern, che è utile per controllare rapidamente l’effetto dei parametri principali, come densità di campionamento, modalità degli archi e filtraggio di visibilità.
+
+La preview non è stata pensata come semplice visualizzazione estetica, ma come strumento operativo per verificare il comportamento della pipeline durante i test. Questo mi ha permesso di confrontare rapidamente diverse configurazioni e di capire quali parametri fossero più sensibili.”
+
+## Slide 8 — Risultati e validazione
+
+**Tempo:** 2 minuti
+
+“Per valutare il comportamento del sistema ho lavorato su diversi casi di studio, sia semplici sia un po’ più complessi.
+
+La validazione è stata principalmente qualitativa. Ho confrontato la preview generata dall’applicazione, l’export SVG e, dove possibile, le simulazioni ottenute in Blender e in CutViewer. L’obiettivo non era dimostrare una corrispondenza fisica perfetta, ma verificare che la struttura geometrica del pattern restasse coerente nelle varie forme di output.
+
+I risultati mostrano che, per modelli semplici e moderatamente complessi, la pipeline riesce a produrre pattern leggibili e consistenti. Inoltre, i test mi hanno permesso di capire meglio quali fossero i parametri più influenti, in particolare la densità di campionamento e la gestione della visibilità.
+
+Quindi il lavoro non si è limitato a costruire il software, ma ha incluso anche una fase abbastanza attenta di verifica e confronto dei risultati.”
+
+## Slide 9 — Limiti e sviluppi futuri
+
+**Tempo:** 2 minuti
+
+“Naturalmente il lavoro presenta anche alcuni limiti.
+
+Il primo è che il modello adottato è una semplificazione geometrica e non una simulazione fisicamente completa dello scratch hologram. Il secondo è che il comportamento della pipeline dipende in modo sensibile dalla configurazione di vista e dalla scelta dei parametri. Il terzo è che la parte di export CNC, pur essendo implementata, non è stata validata con una fabbricazione reale, ma solo a livello di conversione e simulazione.
+
+Detto questo, la tesi ha comunque prodotto una base solida su cui si potrebbe continuare a lavorare. Gli sviluppi più naturali sarebbero un miglioramento delle strategie di visibilità, un campionamento più adattivo, un’ottimizzazione del toolpath e soprattutto una validazione sperimentale su incisioni reali.
+
+La GIF che mostro qui aiuta a vedere il comportamento del pattern in modo più intuitivo: non va letta come dimostrazione conclusiva, ma come supporto visivo ai risultati ottenuti in simulazione.”
+
+## Slide 10 — Conclusioni e ringraziamenti
+
+**Tempo:** 1 minuto e 15
+
+“In conclusione, questa tesi ha affrontato il problema della trasformazione di un modello 3D in un pattern bidimensionale per scratch hologram attraverso una pipeline software esplicita e modulare.
+
+Il contributo principale del lavoro non è tanto un nuovo modello teorico dell’olografia, quanto la costruzione di un processo computazionale chiaro, testabile e sufficientemente robusto per studiare il passaggio da mesh triangolare a traiettoria incisa.
+
+Nonostante alcuni limiti, i risultati ottenuti mostrano che l’approccio è promettente e che la pipeline può costituire una buona base per sviluppi successivi.
+
+Vi ringrazio per l’attenzione, e ringrazio il relatore e le persone che mi hanno supportato durante il lavoro di tesi.”
+
+## Chiusura finale, se ti fanno finire in anticipo
+
+Se arrivi corto di 30–40 secondi, puoi aggiungere questa frase prima dei ringraziamenti:
+
+“Quello che considero più importante, alla fine, è aver reso esplicito un processo che spesso rimane implicito: come si passa da una geometria tridimensionale a un pattern inciso controllabile, osservabile e verificabile in modo coerente nelle diverse fasi della pipeline.”
+
+## Due dritte per farla sembrare tua
+
+Non parlare troppo “da testo scritto”. Ogni tanto spezza con frasi come:
+“qui il punto chiave è…”
+“quello che mi interessava capire era…”
+“nei test si vede abbastanza bene che…”
+“il limite principale, secondo me, è…”
+
+E soprattutto, quando mostri immagini o GIF, fermati mezzo secondo e commentale come se le stessi guardando con loro:
+“qui si vede bene…”
+“in questo caso il pattern diventa più denso…”
+“questa è una configurazione in cui il filtraggio funziona meglio…”
+
+Se vuoi, ti preparo anche una **versione ancora più orale**, quasi da leggere davvero davanti alla commissione, oppure una **scaletta con parole chiave** da tenere accanto senza imparare tutto.
