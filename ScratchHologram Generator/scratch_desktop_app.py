@@ -275,8 +275,8 @@ def write_gcode(
         raise ValueError("Campionamento archi vuoto.")
 
     y_max_u = max(p[1] for p in all_points)
-    scaled_paths: list[list[tuple[float, float]]] = []
-    for path in raw_paths:
+    export_items: list[dict[str, object]] = []
+    for arc, path in zip(arcs, raw_paths):
         scaled_path: list[tuple[float, float]] = []
         for x_u, y_u in path:
             y_src = (y_max_u - y_u) if invert_y else y_u
@@ -284,19 +284,24 @@ def write_gcode(
             y_mm = y_src * mm_per_unit
             scaled_path.append((x_mm, y_mm))
         if len(scaled_path) >= 2:
-            scaled_paths.append(scaled_path)
+            export_items.append({"arc": arc, "scaled_path": scaled_path})
 
-    all_scaled = [pt for path in scaled_paths for pt in path]
+    if len(export_items) == 0:
+        raise ValueError("Nessun percorso esportabile dopo la scalatura.")
+
+    all_scaled = [pt for item in export_items for pt in item["scaled_path"]]  # type: ignore[index]
     min_x_mm = min(p[0] for p in all_scaled)
     min_y_mm = min(p[1] for p in all_scaled)
 
     translated_paths: list[list[tuple[float, float]]] = []
-    for path in scaled_paths:
+    for item in export_items:
+        path = item["scaled_path"]  # type: ignore[index]
         out_path: list[tuple[float, float]] = []
         for x_mm, y_mm in path:
             p = (x_mm - min_x_mm, y_mm - min_y_mm)
             out_path.append(p)
         translated_paths.append(out_path)
+        item["path"] = out_path
 
     def to_mm_xy(x_u: float, y_u: float) -> tuple[float, float]:
         y_src = (y_max_u - y_u) if invert_y else y_u
@@ -314,11 +319,15 @@ def write_gcode(
 
     mode = str(arc_mode).strip().lower()
     use_circular_commands = mode == "semi"
+    path_order = order_paths_for_gcode(translated_paths)
 
     segment_count = 0
     path_count = 0
     total_cut_length = 0.0
-    for arc, path in zip(arcs, translated_paths):
+    for item_idx, reverse_path in path_order:
+        item = export_items[item_idx]
+        arc = item["arc"]  # type: ignore[index]
+        path = item["path"]  # type: ignore[index]
         if len(path) < 2:
             continue
 
@@ -344,6 +353,9 @@ def write_gcode(
             ccw = float(arc.sweep_angle) >= 0.0
             if not invert_y:
                 ccw = not ccw
+            if reverse_path:
+                sx, sy, ex, ey = ex, ey, sx, sy
+                ccw = not ccw
             cmd = "G3" if ccw else "G2"
 
             gcode_lines.append(f"G0 X{sx:.4f} Y{sy:.4f}")
@@ -356,6 +368,8 @@ def write_gcode(
             path_count += 1
             continue
 
+        if reverse_path:
+            path = list(reversed(path))
         sx, sy = path[0]
         gcode_lines.append(f"G0 X{sx:.4f} Y{sy:.4f}")
         gcode_lines.append(f"G1 Z{cut_z_mm:.4f} F{feed_z_mm_min:.2f}")
@@ -383,6 +397,77 @@ def write_gcode(
     gcode_path.parent.mkdir(parents=True, exist_ok=True)
     gcode_path.write_text("\n".join(gcode_lines), encoding="utf-8")
     return path_count, segment_count, total_cut_length
+
+
+def order_paths_for_gcode(paths: list[list[tuple[float, float]]]) -> list[tuple[int, bool]]:
+    """
+    Order independent toolpaths to reduce non-cutting travel.
+
+    Parameters
+    ----------
+    paths : list[list[tuple[float, float]]]
+        Independent planar toolpaths in millimeters.
+
+    Returns
+    -------
+    list[tuple[int, bool]]
+        Sequence of `(path_index, reverse_path)` decisions.
+
+    Notes
+    -----
+    The planner uses a greedy nearest-neighbor strategy from the current tool
+    endpoint, starting at the translated origin `(0, 0)`. The trade-off is
+    that it is not globally optimal, but it is fast and predictable for
+    thousands of short scratch arcs.
+
+    Assumptions
+    -----------
+    Every input path contains at least two points and can be traversed in
+    either direction without changing the intended engraved geometry.
+    """
+
+    if len(paths) <= 1:
+        return [(idx, False) for idx in range(len(paths))]
+
+    remaining = set(range(len(paths)))
+    current_x = 0.0
+    current_y = 0.0
+    ordered: list[tuple[int, bool]] = []
+
+    while remaining:
+        best_idx = -1
+        best_reverse = False
+        best_distance_sq = float("inf")
+        best_end_x = current_x
+        best_end_y = current_y
+
+        for idx in remaining:
+            path = paths[idx]
+            start_x, start_y = path[0]
+            end_x, end_y = path[-1]
+
+            start_distance_sq = (start_x - current_x) ** 2 + (start_y - current_y) ** 2
+            if start_distance_sq < best_distance_sq:
+                best_idx = idx
+                best_reverse = False
+                best_distance_sq = start_distance_sq
+                best_end_x = end_x
+                best_end_y = end_y
+
+            end_distance_sq = (end_x - current_x) ** 2 + (end_y - current_y) ** 2
+            if end_distance_sq < best_distance_sq:
+                best_idx = idx
+                best_reverse = True
+                best_distance_sq = end_distance_sq
+                best_end_x = start_x
+                best_end_y = start_y
+
+        ordered.append((best_idx, best_reverse))
+        remaining.remove(best_idx)
+        current_x = best_end_x
+        current_y = best_end_y
+
+    return ordered
 
 
 def estimate_gcode_footprint_mm(arcs: list[Arc], target_width_mm: float) -> tuple[float, float]:
@@ -531,12 +616,12 @@ class ScratchDesktopApp:
         self.visibility_cull = tk.BooleanVar(value=False)
 
         self.gcode_target_width_mm = 10.0
-        self.gcode_safe_z_mm = 5.0
-        self.gcode_cut_z_mm = -0.02
-        self.gcode_feed_xy_mm_min = 400.0
-        self.gcode_feed_z_mm_min = 120.0
+        self.gcode_safe_z_mm = 0.2
+        self.gcode_cut_z_mm = -0.06
+        self.gcode_feed_xy_mm_min = 600.0
+        self.gcode_feed_z_mm_min = 520.0
         self.gcode_max_segment_mm = 0.20
-        self.gcode_spindle_rpm = 1000
+        self.gcode_spindle_rpm = 0
         self.gcode_invert_y = True
 
         self.status_var = tk.StringVar(value="Apri un file STL per iniziare.")
@@ -1421,7 +1506,7 @@ class ScratchDesktopApp:
 
         cut_z_mm = simpledialog.askfloat(
             "G-code: incisione",
-            "Quota Z di incisione (mm, negativa):\nPer i primi test con punta diamantata prova -0.01 / -0.02.",
+            "Quota Z di incisione (mm, negativa):\nUsa un valore sufficiente a compensare piccoli dislivelli del piano.",
             parent=parent,
             initialvalue=float(self.gcode_cut_z_mm),
         )
@@ -1440,7 +1525,7 @@ class ScratchDesktopApp:
 
         feed_z_mm_min = simpledialog.askfloat(
             "G-code: feed Z",
-            "Feed Z (mm/min):\nValori prudenti riducono il rischio di incidere troppo.",
+            "Feed Z (mm/min):\nMantienilo compatibile con la dinamica reale dell'asse Z.",
             parent=parent,
             initialvalue=float(self.gcode_feed_z_mm_min),
             minvalue=1.0,
@@ -1460,7 +1545,7 @@ class ScratchDesktopApp:
 
         spindle_rpm = simpledialog.askinteger(
             "G-code: mandrino",
-            "RPM mandrino (0 = non emettere M3/M5):\n1000 e' un punto di partenza prudente se vuoi tenerlo acceso.",
+            "RPM mandrino (0 = non emettere M3/M5):\nLascia 0 se vuoi incidere con utensile non rotante.",
             parent=parent,
             initialvalue=int(self.gcode_spindle_rpm),
             minvalue=0,

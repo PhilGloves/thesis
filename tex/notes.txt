@@ -1,0 +1,2 @@
+Cos'è lo z-buffer?
+Ho costruito una mappa di profondità dell’immagine proiettata e ho confrontato la profondità dei punti campionati con quella delle superfici della mesh. Se un punto risulta più lontano rispetto alla superficie visibile nello stesso pixel, viene considerato occluso.
