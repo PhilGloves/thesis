@@ -62,7 +62,21 @@ Questo rende il processo più leggibile e più facilmente controllabile.
 
 Inoltre, ogni passaggio dipende dai precedenti: se cambia la vista, cambia la proiezione; se cambia il campionamento, cambia il numero di archi; se cambia il filtraggio di visibilità, cambia il contenuto stesso del pattern.”
 
-Slide 5 — Software sviluppato
+Slide 5 — Dal modello 3D al pattern di graffi
+
+Tempo: circa 1 minuto e 10
+
+“Questa slide riassume in modo molto sintetico la parte centrale del lavoro sviluppato nella tesi.
+
+A sinistra si vede il modello 3D di partenza; al centro una rappresentazione semplificata degli spigoli con i punti campionati lungo di essi; a destra il pattern finale di graffi, cioè l’insieme di archi bidimensionali generati dalla pipeline.
+
+L’idea importante è che il software non si limita a visualizzare il modello, ma lo trasforma in una struttura 2D utilizzabile per la preview e per l’esportazione.
+
+In altre parole, questa è la funzione principale della pipeline che ho sviluppato: prendere una mesh 3D, selezionare gli elementi geometrici più rilevanti, campionarli e convertirli in traiettorie bidimensionali leggibili.
+
+Qui non entro nei dettagli tecnici, ma il messaggio che volevo far passare è proprio questo: dal modello tridimensionale si arriva a un pattern di graffi controllabile, che costituisce la base dello scratch hologram.”
+
+Slide 6 — Software sviluppato
 
 Tempo: circa 1 minuto e 40
 
@@ -76,7 +90,7 @@ Per questo motivo il software non è stato pensato solo come generatore di archi
 
 Più che un software pensato fin da subito come strumento finale di produzione, lo definirei quindi uno strumento sperimentale ben strutturato, utile per capire il comportamento della pipeline e verificare in modo abbastanza sistematico la relazione tra parametri e risultati.”
 
-Slide 6 — Test e validazione
+Slide 7 — Test e validazione
 
 Tempo: circa 2 minuti
 
@@ -96,7 +110,7 @@ Questi casi sono stati utili perché hanno mostrato che la pipeline era molto se
 
 La validazione, in questa fase, è stata soprattutto qualitativa: l’obiettivo non era ottenere una misura numerica assoluta di qualità, ma verificare se il sistema produceva risultati coerenti e interpretabili al variare dei parametri principali.”
 
-Slide 7 — Effetto dei parametri sul pattern
+Slide 8 — Effetto dei parametri sul pattern
 
 Tempo: circa 2 minuti
 
@@ -118,7 +132,7 @@ Tuttavia, nel test effettuato, il tempo complessivo di incisione è risultato le
 
 Secondo me questo è interessante proprio perché fa capire che non esiste una configurazione universalmente migliore: bisogna sempre valutare insieme forma del pattern, modalità geometrica e comportamento della macchina.”
 
-Slide 8 — Risultati qualitativi
+Slide 9 — Risultati qualitativi
 
 Tempo: circa 2 minuti e 10
 
@@ -136,7 +150,23 @@ Per esempio, su un oggetto architettonico molto complesso come la Mole, o comunq
 
 Questa parte, secondo me, è stata importante perché mi ha permesso non solo di vedere se la pipeline produceva un risultato, ma anche di confrontare diverse rappresentazioni dello stesso pattern e capire in quali casi il metodo risultava più convincente.”
 
-Slide 9 — Limiti attuali e sviluppi futuri
+Slide 10 — Setup sperimentale e prove di incisione
+
+Tempo: circa 1 minuto e 20
+
+“Dopo la parte di simulazione e validazione qualitativa, ho svolto anche alcune prove preliminari di incisione reale, e in questa slide mostro il setup sperimentale utilizzato.
+
+La macchina impiegata è una VEVOR CNC Router a 3 assi, con mandrino da 300 watt e controllo GRBL, equipaggiata con una punta diamantata da 60 gradi.
+
+I materiali testati sono stati soprattutto acrilico nero riflettente e alluminio. Nella foto a destra si vede la macchina durante una prova di incisione.
+
+Questi test mi sono serviti per verificare quanto il passaggio dal pattern digitale alla lavorazione reale fosse sensibile non solo alla geometria generata dal software, ma anche a fattori pratici come il materiale, la planarità della superficie e la profondità del graffio.
+
+Le profondità usate sono state circa meno 0,02 millimetri su acrilico e circa meno 0,1 su alluminio.
+
+Come mostro nella slide successiva, proprio queste prove hanno evidenziato alcuni limiti pratici molto interessanti, soprattutto nel caso dell’acrilico.”
+
+Slide 11 — Limiti attuali e sviluppi futuri
 
 Tempo: circa 2 minuti e 30
 
@@ -148,7 +178,7 @@ In altre parole, il sistema riesce a generare un pattern plausibile a partire da
 
 Il secondo limite è che, su mesh più complesse, aumentano sia la densità del pattern sia il costo computazionale, e questo può ridurre la leggibilità locale della preview.
 
-Per quanto riguarda invece la parte fisica, qui devo fare una precisazione rispetto a quanto scritto nella tesi. Dopo la consegna sono riuscito a fare anche alcune prove reali di incisione.
+Le prove reali di incisione che ho appena mostrato mi hanno permesso di evidenziare alcuni limiti pratici che nella tesi erano rimasti solo accennati.
 
 Ho testato un piano in acrilico nero riflettente, ma i risultati non sono stati molto precisi perché il piano presentava micro-imperfezioni. Impostando un graffio molto leggero, circa a meno 0,02 millimetri, la CNC ha prodotto incisioni più o meno evidenti a seconda delle deformazioni locali della superficie, e questo rendeva il pattern poco leggibile nel suo insieme.
 
@@ -162,7 +192,7 @@ Per questo motivo, oggi direi che i risultati sono promettenti ma non conclusivi
 
 Ed è proprio qui che vedo gli sviluppi futuri più interessanti: migliorare il culling, rendere il campionamento più adattivo, ottimizzare il toolpath e soprattutto fare più test fisici con setup meccanici più adatti.”
 
-Slide 10 — Grazie
+Slide 12 — Grazie
 
 Tempo: circa 45 secondi
 

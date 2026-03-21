@@ -1907,6 +1907,343 @@ def compute_sim_bounds_from_arcs(arcs: list[Arc]) -> tuple[float, float, float, 
     return min_x, min_y, max_x, max_y
 
 
+def _create_rgb_canvas(
+    width: int,
+    height: int,
+    background: tuple[int, int, int] = (255, 255, 255),
+) -> np.ndarray:
+    """Create a solid RGB canvas for lightweight debug rendering."""
+
+    image = np.empty((max(1, int(height)), max(1, int(width)), 3), dtype=np.uint8)
+    image[:, :] = np.asarray(background, dtype=np.uint8)
+    return image
+
+
+def _draw_disc_rgb(
+    image: np.ndarray,
+    x: float,
+    y: float,
+    radius: int,
+    color: tuple[int, int, int],
+) -> None:
+    """Rasterize one filled disc with integer clipping."""
+
+    cx = int(round(float(x)))
+    cy = int(round(float(y)))
+    rr = max(1, int(radius))
+    y0 = max(0, cy - rr)
+    y1 = min(image.shape[0] - 1, cy + rr)
+    x0 = max(0, cx - rr)
+    x1 = min(image.shape[1] - 1, cx + rr)
+    if x0 > x1 or y0 > y1:
+        return
+
+    yy, xx = np.ogrid[y0 : y1 + 1, x0 : x1 + 1]
+    mask = ((xx - cx) ** 2 + (yy - cy) ** 2) <= (rr * rr)
+    image[y0 : y1 + 1, x0 : x1 + 1][mask] = np.asarray(color, dtype=np.uint8)
+
+
+def _draw_line_rgb(
+    image: np.ndarray,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    color: tuple[int, int, int],
+    thickness: int = 1,
+) -> None:
+    """Rasterize a line segment by stepping along its dominant screen axis."""
+
+    dx = float(x1) - float(x0)
+    dy = float(y1) - float(y0)
+    steps = max(1, int(math.ceil(max(abs(dx), abs(dy)))))
+    xs = np.linspace(float(x0), float(x1), steps + 1)
+    ys = np.linspace(float(y0), float(y1), steps + 1)
+    radius = max(1, int(thickness))
+    for px, py in zip(xs, ys):
+        _draw_disc_rgb(image, px, py, radius, color)
+
+
+def _fill_triangle_rgb(
+    image: np.ndarray,
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    color: tuple[int, int, int],
+) -> None:
+    """Rasterize a filled triangle using barycentric edge tests."""
+
+    ax, ay = float(p0[0]), float(p0[1])
+    bx, by = float(p1[0]), float(p1[1])
+    cx, cy = float(p2[0]), float(p2[1])
+
+    min_x = max(0, int(math.floor(min(ax, bx, cx))))
+    max_x = min(image.shape[1] - 1, int(math.ceil(max(ax, bx, cx))))
+    min_y = max(0, int(math.floor(min(ay, by, cy))))
+    max_y = min(image.shape[0] - 1, int(math.ceil(max(ay, by, cy))))
+    if min_x > max_x or min_y > max_y:
+        return
+
+    def edge_fn(xa: float, ya: float, xb: float, yb: float, xp: np.ndarray, yp: np.ndarray) -> np.ndarray:
+        return ((xp - xa) * (yb - ya)) - ((yp - ya) * (xb - xa))
+
+    xx, yy = np.meshgrid(
+        np.arange(min_x, max_x + 1, dtype=np.float64) + 0.5,
+        np.arange(min_y, max_y + 1, dtype=np.float64) + 0.5,
+    )
+    w0 = edge_fn(ax, ay, bx, by, xx, yy)
+    w1 = edge_fn(bx, by, cx, cy, xx, yy)
+    w2 = edge_fn(cx, cy, ax, ay, xx, yy)
+    mask = ((w0 >= 0.0) & (w1 >= 0.0) & (w2 >= 0.0)) | ((w0 <= 0.0) & (w1 <= 0.0) & (w2 <= 0.0))
+    image[min_y : max_y + 1, min_x : max_x + 1][mask] = np.asarray(color, dtype=np.uint8)
+
+
+def _sample_arc_points_for_png(arc: Arc) -> np.ndarray:
+    """Approximate one arc with a polyline suitable for PNG preview export."""
+
+    rx = max(float(arc.rect_w) / 2.0, 0.0)
+    ry = max(float(arc.rect_h) / 2.0, 0.0)
+    cx = float(arc.rect_x) + rx
+    cy = float(arc.rect_y) + ry
+    sweep = float(arc.sweep_angle)
+    seg_count = max(24, int(math.ceil(max(abs(rx), abs(ry), 1.0) * max(abs(sweep), 1.0) / 24.0)))
+    angles = np.linspace(float(arc.start_angle), float(arc.start_angle) + sweep, seg_count + 1)
+    radians = np.deg2rad(angles)
+    x = cx + (rx * np.cos(radians))
+    y = cy - (ry * np.sin(radians))
+    return np.column_stack((x, y))
+
+
+def _build_slide_transform(
+    min_x: float,
+    min_y: float,
+    max_x: float,
+    max_y: float,
+    out_width: int,
+    out_height: int,
+    padding: int,
+) -> tuple[float, float, float]:
+    """Compute a uniform fit transform from screen-space bounds to slide pixels."""
+
+    span_x = max(float(max_x - min_x), 1.0)
+    span_y = max(float(max_y - min_y), 1.0)
+    avail_w = max(1.0, float(out_width - (2 * padding)))
+    avail_h = max(1.0, float(out_height - (2 * padding)))
+    scale = min(avail_w / span_x, avail_h / span_y)
+    used_w = span_x * scale
+    used_h = span_y * scale
+    tx = (float(padding) + ((avail_w - used_w) / 2.0)) - (min_x * scale)
+    ty = (float(padding) + ((avail_h - used_h) / 2.0)) - (min_y * scale)
+    return scale, tx, ty
+
+
+def _transform_xy(points_xy: np.ndarray, scale: float, tx: float, ty: float) -> np.ndarray:
+    """Apply one affine fit transform to a `(N, 2)` screen-space array."""
+
+    pts = np.asarray(points_xy, dtype=np.float64)
+    out = np.empty((pts.shape[0], 2), dtype=np.float64)
+    out[:, 0] = (pts[:, 0] * scale) + tx
+    out[:, 1] = (pts[:, 1] * scale) + ty
+    return out
+
+
+def write_slide_debug_assets(
+    out_dir: Path,
+    model_vertices: np.ndarray,
+    model_faces: np.ndarray,
+    projected_vertices: np.ndarray,
+    edges: list[Edge],
+    arcs: list[Arc],
+    camera: CameraConfig,
+    view_points_per_unit_length: float,
+    sample_visibility_by_edge: dict[int, np.ndarray] | None = None,
+) -> dict[str, str]:
+    """
+    Export slide-friendly PNG assets illustrating the mesh-to-pattern pipeline.
+
+    Parameters
+    ----------
+    out_dir : Path
+        Destination directory.
+    model_vertices : np.ndarray
+        Mesh vertices in model units.
+    model_faces : np.ndarray
+        Triangle indices.
+    projected_vertices : np.ndarray
+        Mesh vertices projected in screen coordinates.
+    edges : list[Edge]
+        Mesh edges used for edge sampling.
+    arcs : list[Arc]
+        Final visible arc pattern.
+    camera : CameraConfig
+        Projection camera used by the pipeline.
+    view_points_per_unit_length : float
+        Edge sampling density.
+    sample_visibility_by_edge : dict[int, np.ndarray] | None, optional
+        Visibility decisions for each edge sample.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping from asset label to written file path.
+
+    Notes
+    -----
+    These exports are intentionally simplified for presentation use: they aim
+    to explain the pipeline visually, not to expose every debug detail.
+
+    Assumptions
+    -----------
+    `projected_vertices` was generated with the same camera used for `arcs`.
+    """
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    finite_vertices = projected_vertices[np.all(np.isfinite(projected_vertices[:, :2]), axis=1)]
+    if finite_vertices.shape[0] == 0:
+        raise ValueError("Impossibile creare slide debug: proiezione mesh vuota.")
+
+    min_x = float(np.min(finite_vertices[:, 0]))
+    min_y = float(np.min(finite_vertices[:, 1]))
+    max_x = float(np.max(finite_vertices[:, 0]))
+    max_y = float(np.max(finite_vertices[:, 1]))
+    if arcs:
+        arc_min_x, arc_min_y, arc_max_x, arc_max_y = compute_sim_bounds_from_arcs(arcs)
+        min_x = min(min_x, arc_min_x)
+        min_y = min(min_y, arc_min_y)
+        max_x = max(max_x, arc_max_x)
+        max_y = max(max_y, arc_max_y)
+
+    out_width = 1600
+    out_height = 1200
+    padding = 80
+    scale, tx, ty = _build_slide_transform(min_x, min_y, max_x, max_y, out_width, out_height, padding)
+    projected_xy = _transform_xy(projected_vertices[:, :2], scale, tx, ty)
+
+    light_dir = np.asarray((0.30, 0.45, 0.84), dtype=np.float64)
+    light_dir = light_dir / max(float(np.linalg.norm(light_dir)), EPS)
+
+    model_img = _create_rgb_canvas(out_width, out_height)
+    face_records: list[tuple[float, tuple[float, float], tuple[float, float], tuple[float, float], tuple[int, int, int]]] = []
+    for tri in model_faces:
+        i0, i1, i2 = int(tri[0]), int(tri[1]), int(tri[2])
+        q0 = projected_vertices[i0]
+        q1 = projected_vertices[i1]
+        q2 = projected_vertices[i2]
+        if not (
+            np.all(np.isfinite(q0[:3]))
+            and np.all(np.isfinite(q1[:3]))
+            and np.all(np.isfinite(q2[:3]))
+        ):
+            continue
+        p0 = model_vertices[i0]
+        p1 = model_vertices[i1]
+        p2 = model_vertices[i2]
+        n = np.cross(p1 - p0, p2 - p0)
+        n_len = float(np.linalg.norm(n))
+        if n_len < EPS:
+            continue
+        n = n / n_len
+        shade = max(0.15, float(np.dot(n, light_dir)))
+        tone = int(round(220 - (70 * shade)))
+        color = (tone, tone, min(245, tone + 10))
+        face_records.append(
+            (
+                float((q0[2] + q1[2] + q2[2]) / 3.0),
+                tuple(projected_xy[i0]),
+                tuple(projected_xy[i1]),
+                tuple(projected_xy[i2]),
+                color,
+            )
+        )
+    face_records.sort(key=lambda item: item[0])
+    for _, p0, p1, p2, color in face_records:
+        _fill_triangle_rgb(model_img, p0, p1, p2, color)
+    for edge in edges:
+        p0 = projected_xy[edge.start_idx]
+        p1 = projected_xy[edge.end_idx]
+        _draw_line_rgb(model_img, p0[0], p0[1], p1[0], p1[1], (70, 84, 96), thickness=1)
+
+    sample_img = _create_rgb_canvas(out_width, out_height)
+    visibility_img = _create_rgb_canvas(out_width, out_height)
+    for edge in edges:
+        p0 = projected_xy[edge.start_idx]
+        p1 = projected_xy[edge.end_idx]
+        _draw_line_rgb(sample_img, p0[0], p0[1], p1[0], p1[1], (190, 196, 205), thickness=1)
+        _draw_line_rgb(visibility_img, p0[0], p0[1], p1[0], p1[1], (220, 224, 230), thickness=1)
+
+    model_to_window_mtx = build_model_to_window_matrix(camera)
+    sample_points_xy: list[np.ndarray] = []
+    visible_points_xy: list[np.ndarray] = []
+    hidden_points_xy: list[np.ndarray] = []
+    for edge in edges:
+        model_points = sample_edge_model_points(model_vertices, edge, view_points_per_unit_length)
+        if model_points.shape[0] == 0:
+            continue
+        screen_points = model_to_window(model_points, model_to_window_mtx)
+        valid = np.all(np.isfinite(screen_points[:, :2]), axis=1)
+        if not np.any(valid):
+            continue
+        screen_xy = _transform_xy(screen_points[valid, :2], scale, tx, ty)
+        sample_points_xy.append(screen_xy)
+
+        vis_mask = None if sample_visibility_by_edge is None else sample_visibility_by_edge.get(edge.edge_id)
+        if vis_mask is None or len(vis_mask) != screen_points.shape[0]:
+            visible_points_xy.append(screen_xy)
+            continue
+        vis_valid = np.asarray(vis_mask, dtype=bool)[valid]
+        if np.any(vis_valid):
+            visible_points_xy.append(screen_xy[vis_valid])
+        if np.any(~vis_valid):
+            hidden_points_xy.append(screen_xy[~vis_valid])
+
+    for pts in sample_points_xy:
+        for px, py in pts:
+            _draw_disc_rgb(sample_img, px, py, 6, (44, 102, 184))
+    for pts in hidden_points_xy:
+        for px, py in pts:
+            _draw_disc_rgb(visibility_img, px, py, 4, (232, 154, 142))
+    for pts in visible_points_xy:
+        for px, py in pts:
+            _draw_disc_rgb(visibility_img, px, py, 6, (35, 92, 176))
+
+    pattern_img = _create_rgb_canvas(out_width, out_height)
+    for arc in arcs:
+        arc_pts = _sample_arc_points_for_png(arc)
+        arc_pts = _transform_xy(arc_pts, scale, tx, ty)
+        for idx in range(arc_pts.shape[0] - 1):
+            _draw_line_rgb(
+                pattern_img,
+                arc_pts[idx, 0],
+                arc_pts[idx, 1],
+                arc_pts[idx + 1, 0],
+                arc_pts[idx + 1, 1],
+                (20, 24, 34),
+                thickness=2,
+            )
+
+    model_path = out_dir / "slide_model_3d.png"
+    sample_path = out_dir / "slide_sample_points.png"
+    visibility_path = out_dir / "slide_visibility.png"
+    pattern_path = out_dir / "slide_final_pattern.png"
+    pattern_svg_path = out_dir / "slide_final_pattern.svg"
+
+    write_png_image(model_path, model_img)
+    write_png_image(sample_path, sample_img)
+    write_png_image(visibility_path, visibility_img)
+    write_png_image(pattern_path, pattern_img)
+    write_svg(pattern_svg_path, arcs, stroke_width=1.2)
+
+    return {
+        "model_png": str(model_path),
+        "sample_points_png": str(sample_path),
+        "visibility_png": str(visibility_path),
+        "final_pattern_png": str(pattern_path),
+        "final_pattern_svg": str(pattern_svg_path),
+    }
+
+
 def write_simulation_html(
     html_path: Path,
     model_vertices: np.ndarray,
@@ -2599,6 +2936,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional interactive HTML simulator with View Angle slider.",
     )
+    parser.add_argument(
+        "--slide-debug-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for slide-friendly PNG/SVG exports.",
+    )
 
     parser.add_argument(
         "--line-resolution",
@@ -2769,13 +3112,19 @@ def run(args: argparse.Namespace) -> int:
         model_to_window_mtx=model_to_window_mtx,
         model_to_view_mtx=model_to_view_mtx,
     )
-    sample_visibility_by_edge, _vis_stats = build_sample_visibility_lookup(
+    slide_debug_prefix = None
+    if args.slide_debug_dir is not None:
+        Path(args.slide_debug_dir).mkdir(parents=True, exist_ok=True)
+        slide_debug_prefix = Path(args.slide_debug_dir) / "slide_visibility_technical"
+
+    sample_visibility_by_edge, vis_stats = build_sample_visibility_lookup(
         model_vertices=model_vertices,
         edges=edges,
         faces=model_faces,
         camera=camera,
         view_points_per_unit_length=pipeline.line_resolution,
         zbuffer_resolution=1024,
+        debug_output_prefix=slide_debug_prefix,
     )
     arcs = generate_arcs(
         model_vertices=model_vertices,
@@ -2820,15 +3169,42 @@ def run(args: argparse.Namespace) -> int:
             arcs=arcs,
         )
 
+    slide_assets: dict[str, str] | None = None
+    if args.slide_debug_dir is not None:
+        slide_assets = write_slide_debug_assets(
+            out_dir=args.slide_debug_dir,
+            model_vertices=model_vertices,
+            model_faces=model_faces,
+            projected_vertices=zero_vertices,
+            edges=edges,
+            arcs=arcs,
+            camera=camera,
+            view_points_per_unit_length=pipeline.line_resolution,
+            sample_visibility_by_edge=sample_visibility_by_edge,
+        )
+
     print(f"[OK] STL loaded: {args.stl}")
     print(f"[OK] Unique edges: {len(edges)}")
     print(f"[OK] Arcs generated: {len(arcs_all)}")
     print(f"[OK] Arcs visible after cull: {len(arcs)}")
     print(f"[OK] SVG saved: {args.svg}")
+    print(
+        "[OK] Visibility stats: "
+        f"total_samples={int(vis_stats['total_samples'])} | "
+        f"visible_samples={int(vis_stats['visible_samples'])} | "
+        f"coverage={vis_stats['zbuffer_coverage_ratio']:.4f}"
+    )
     if args.simulate_html is not None:
         print(f"[OK] Simulation HTML saved: {args.simulate_html}")
     if args.json is not None:
         print(f"[OK] JSON saved: {args.json}")
+    if slide_assets is not None:
+        for label, path in slide_assets.items():
+            print(f"[OK] Slide asset {label}: {path}")
+        if "coverage_debug_png" in vis_stats:
+            print(f"[OK] Slide asset technical_coverage: {vis_stats['coverage_debug_png']}")
+        if "sample_debug_png" in vis_stats:
+            print(f"[OK] Slide asset technical_samples: {vis_stats['sample_debug_png']}")
     return 0
 
 
