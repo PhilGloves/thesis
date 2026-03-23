@@ -1,38 +1,25 @@
 Slide 1 — Titolo
 
-Tempo: circa 55 secondi
-
-“Buongiorno a tutti, sono [NOME COGNOME] e oggi vi presento il mio lavoro di tesi, intitolato Pipeline computazionale per la fabbricazione digitale di scratch hologram: dal modello 3D al G-code.
-
+Buongiorno a tutti, sono Filippo Guanti e oggi vi presento il mio lavoro di tesi, intitolato Pipeline computazionale per la fabbricazione digitale di scratch hologram: dal modello 3D al G-code.
 Questo lavoro nasce dall’interesse per gli scratch hologram, cioè immagini incise su superfici riflettenti che possono produrre un’illusione di profondità.
-
 Dal punto di vista informatico, la domanda che mi interessava affrontare era come passare da un modello tridimensionale, descritto come mesh triangolare, cioè una geometria 3D approssimata tramite un insieme di triangoli, a un pattern bidimensionale controllabile, visualizzabile ed esportabile.
-
-Quindi il punto centrale della tesi è stato capire come trasformare una forma 3D in un insieme di traiettorie 2D che mantenessero una relazione leggibile con il modello di partenza.”
+Quindi il punto centrale della tesi è stato capire come trasformare una forma 3D in un insieme di traiettorie 2D che mantenessero una relazione leggibile con il modello di partenza.
 
 Slide 2 — Contesto e obiettivo
-
-Tempo: circa 1 minuto e 25
-
-“In questa slide introduco il contesto generale del lavoro.
 
 Gli scratch hologram sono immagini incise su superfici riflettenti che possono produrre un’illusione di profondità. In altre parole, la forma tridimensionale non viene ricostruita come volume reale, ma suggerita attraverso un pattern di incisioni che modifica il modo in cui la luce viene riflessa.
 
 Dal punto di vista informatico, questo porta a un problema interessante: come si può trasformare un modello 3d (sotto forma di file STL) in un pattern 2D che sia abbastanza controllabile da poter essere analizzato, visualizzato e potenzialmente fabbricato?
-
 L’obiettivo della tesi è stato quindi progettare una pipeline riproducibile, con preview interattiva e validazione qualitativa.
-
 È importante chiarire che il focus del lavoro non è stato costruire una simulazione ottica completa del fenomeno, ma definire una pipeline geometrica coerente, in cui fosse possibile controllare i parametri principali e osservare in modo chiaro il loro effetto sul pattern finale.
 
 Questa impostazione mi ha permesso di concentrarmi soprattutto sulla struttura del processo: input 3D, trasformazioni geometriche, generazione del pattern, preview, esportazione e verifica dei risultati.”
 
 Slide 3 — Dallo stato dell’arte alla proposta
 
-Tempo: circa 1 minuto e 50
+Innanzitutto ho iniziato il mio lavoro di tesi ricercando e analizzando alcune soluzioni esistenti.
 
-“Prima di sviluppare la pipeline, ho analizzato alcune soluzioni esistenti.
-
-In particolare, ho preso come riferimento HoloZens, che è una fork di un progetto originariamente sviluppato da Mike Miller. A sua volta, quel lavoro riprendeva idee e principi già presenti anche in risorse amatoriali storiche dedicate agli scratch hologram, come il sito di Amasci.
+In particolare, ho preso come riferimento HoloZens, che è una fork di un progetto originariamente sviluppato da Mike Miller. A sua volta, quel lavoro riprendeva idee e principi già presenti anche in risorse amatoriali storiche dedicate agli scratch hologram, come il sito di Amasci, del ricercatore William J. Beaty, un Ingegnere ricercatore americano che aveva investigato sul fenomeno già a partire dal 1994.
 
 Questo passaggio è stato utile perché mi ha permesso di capire come altri autori avevano affrontato il problema della trasformazione di una geometria 3D in uno scratch pattern.
 
@@ -46,41 +33,27 @@ Quindi la proposta della tesi nasce proprio da questo: partire dallo stato dell�
 
 Slide 4 — Pipeline proposta
 
-Tempo: circa 1 minuto e 35
-
-“Questa slide mostra la struttura generale della pipeline.
-
-Si parte da un input in formato STL. Da lì vengono estratti gli spigoli rilevanti della mesh, che poi vengono campionati lungo la loro lunghezza. I punti campionati vengono proiettati secondo una configurazione di vista scelta dall’utente e successivamente sottoposti a una fase di culling.
-
-Qui il culling è semplicemente un filtraggio che serve a scartare i punti che, rispetto alla vista scelta, risultano nascosti o comunque non utili alla costruzione del pattern finale.
+Si parte da un input in formato STL. Da lì vengono estratti gli spigoli rilevanti della mesh, che poi vengono campionati lungo la loro lunghezza. I punti campionati vengono proiettati secondo una configurazione di vista scelta dall’utente e successivamente sottoposti a una fase di culling. Qui il culling è semplicemente un filtraggio che serve a scartare i punti che, rispetto alla vista scelta, risultano nascosti o comunque non utili alla costruzione del pattern finale.
 
 A partire da questi dati viene poi generato il pattern sotto forma di archi nel piano bidimensionale. Questo pattern può essere visualizzato in preview e poi esportato.
-
 Qui il punto importante è che il risultato della pipeline non è prima di tutto un render o una semplice immagine, ma una struttura geometrica vera e propria, fatta di archi ed elementi geometrici espliciti, che può poi essere visualizzata ed esportata.
-
 Questo rende il processo più leggibile e più facilmente controllabile.
-
-Inoltre, ogni passaggio dipende dai precedenti: se cambia la vista, cambia la proiezione; se cambia il campionamento, cambia il numero di archi; se cambia il filtraggio di visibilità, cambia il contenuto stesso del pattern.”
+Inoltre, ogni passaggio dipende dai precedenti: se cambia la vista, cambia la proiezione; se cambia il campionamento, cambia il numero di archi; se cambia il filtraggio di visibilità, cambia il contenuto stesso del pattern.
 
 Slide 5 — Dal modello 3D al pattern di graffi
-
-Tempo: circa 1 minuto e 10
-
-“Questa slide riassume in modo molto sintetico la parte centrale del lavoro sviluppato nella tesi.
+Questa slide riassume in modo molto sintetico la parte centrale del lavoro sviluppato nella tesi.
 
 A sinistra si vede il modello 3D di partenza; al centro una rappresentazione semplificata degli spigoli con i punti campionati lungo di essi; a destra il pattern finale di graffi, cioè l’insieme di archi bidimensionali generati dalla pipeline.
 
-L’idea importante è che il software non si limita a visualizzare il modello, ma lo trasforma in una struttura 2D utilizzabile per la preview e per l’esportazione.
+Il software non si limita a visualizzare il modello, ma lo trasforma in una struttura 2D utilizzabile per la preview e per l’esportazione.
 
 In altre parole, questa è la funzione principale della pipeline che ho sviluppato: prendere una mesh 3D, selezionare gli elementi geometrici più rilevanti, campionarli e convertirli in traiettorie bidimensionali leggibili.
 
-Qui non entro nei dettagli tecnici, ma il messaggio che volevo far passare è proprio questo: dal modello tridimensionale si arriva a un pattern di graffi controllabile, che costituisce la base dello scratch hologram.”
+Qui non entro nei dettagli tecnici, ma il messaggio che volevo far passare è proprio questo: dal modello tridimensionale si arriva a un pattern di graffi controllabile, che costituisce la base dello scratch hologram.
 
 Slide 6 — Software sviluppato
 
-Tempo: circa 1 minuto e 40
-
-“L’architettura è stata organizzata separando il nucleo geometrico dall’interfaccia desktop. Questo permette di distinguere chiaramente la parte che carica il modello, genera il pattern e gestisce gli output dalla parte usata per la preview interattiva e per la regolazione dei parametri.
+L’architettura è stata organizzata separando il nucleo geometrico dall’interfaccia desktop. Questo permette di distinguere chiaramente la parte che carica il modello, genera il pattern e gestisce gli output dalla parte usata per la preview interattiva e per la regolazione dei parametri.
 
 Dal punto di vista pratico, l’applicazione consente di caricare modelli STL, modificare la configurazione di vista, regolare densità di campionamento, modalità degli archi e filtraggio di visibilità, e osservare immediatamente l’effetto di queste scelte sul pattern.
 
@@ -88,55 +61,44 @@ Durante lo sviluppo è emerso abbastanza presto un limite importante: nelle prim
 
 Per questo motivo il software non è stato pensato solo come generatore di archi, ma come strumento sperimentale in cui fosse possibile controllare meglio la visibilità, ridurre il rumore geometrico e osservare in modo più chiaro l’effetto dei parametri.
 
-Più che un software pensato fin da subito come strumento finale di produzione, lo definirei quindi uno strumento sperimentale ben strutturato, utile per capire il comportamento della pipeline e verificare in modo abbastanza sistematico la relazione tra parametri e risultati.”
+Più che un software pensato fin da subito come strumento finale di produzione, lo definirei quindi uno strumento sperimentale ben strutturato, utile per capire il comportamento della pipeline e verificare in modo abbastanza sistematico la relazione tra parametri e risultati.
+
+todo: non parli di output considerati, così come nella slide
 
 Slide 7 — Test e validazione
-
-Tempo: circa 2 minuti
-
-“Questa slide riguarda la parte di test e validazione.
 
 Una parte importante del lavoro è stata capire come i parametri influenzassero concretamente il pattern generato. In particolare, qui riporto un test sul cubo in cui ho variato il parametro line_resolution, cioè la densità di campionamento.
 
 Il cubo è stato scelto come caso di studio principale perché è una geometria semplice, leggibile e utile per osservare con chiarezza come cambia il numero di archi al variare dei parametri.
 
-Se nella slide è presente anche la tabella, questa aiuta a vedere in modo più immediato come, al crescere della line resolution, aumenti il numero di traiettorie generate. Questo rende quantitativo un effetto che altrimenti si vedrebbe solo in modo visivo.
+Questo grafico aiuta a vedere in modo più immediato come, al crescere della line resolution, aumenti il numero di traiettorie generate. Questo rende quantitativo un effetto che altrimenti si vedrebbe solo in modo visivo.
 
 Quello che emerge è che aumentando la densità di campionamento il pattern diventa più ricco, ma non automaticamente migliore: oltre una certa soglia aumenta anche il rischio di avere un pattern troppo denso e quindi meno leggibile.
 
-Durante lo sviluppo, però, non tutti i test producevano risultati coerenti. In alcune configurazioni, modelli molto semplici come il cubo perdevano completamente la propria forma attesa, e il pattern risultante assumeva geometrie deformate, a volte simili a parallelepipedi irregolari o a strutture difficili da interpretare.
+Durante lo sviluppo ho riscontrato un problema nella preview: la proiezione risultava inizialmente troppo prospettica e, in alcune configurazioni di vista, anche un modello semplice come il cubo poteva apparire deformato in modo eccessivo. Il problema non dipendeva tanto dalla mesh in sé, quanto dal modo in cui camera e proiezione trasformavano il modello sullo schermo.
 
-Questi casi sono stati utili perché hanno mostrato che la pipeline era molto sensibile a errori di proiezione, parametri di campionamento e gestione della visibilità. In altre parole, non bastava ottenere un output: bisognava anche verificarne la coerenza geometrica.
+Per migliorare la situazione, la proiezione è stata resa più stabile, avvicinandola a una vista quasi ortografica, e lo zoom è stato separato dal movimento fisico della camera. In questo modo, cambiando la vista, la forma del modello resta più coerente e leggibile. Questo passaggio è stato importante perché ha mostrato che non bastava ottenere un output: bisognava anche controllare la stabilità visiva della rappresentazione.
 
-La validazione, in questa fase, è stata soprattutto qualitativa: l’obiettivo non era ottenere una misura numerica assoluta di qualità, ma verificare se il sistema produceva risultati coerenti e interpretabili al variare dei parametri principali.”
+La validazione, in questa fase, è stata soprattutto qualitativa: l’obiettivo non era ottenere una misura numerica assoluta di qualità, ma verificare se il sistema produceva risultati coerenti e interpretabili al variare dei parametri principali.
 
 Slide 8 — Effetto dei parametri sul pattern
 
-Tempo: circa 2 minuti
-
-“Questa slide mostra in modo abbastanza chiaro quanto il pattern dipenda dai parametri scelti.
+Questa slide mostra in modo abbastanza chiaro quanto il pattern dipenda dai parametri scelti.
 
 Il primo parametro importante è l’angolo di vista. Cambiando la vista, cambia la proiezione della mesh e quindi cambia anche il pattern risultante. Questo è naturale, ma è importante vederlo in modo esplicito, perché significa che la vista non è un dettaglio secondario: fa parte del comportamento stesso del sistema.
 
 Il secondo aspetto importante è la modalità di generazione degli archi. Nella pipeline ho considerato sia una modalità semicircle, più semplice e regolare, sia una modalità elliptic, che introduce traiettorie più morbide e continue.
 
-La modalità ellittica è interessante perché in alcuni casi produce pattern visivamente più fluidi. Tuttavia, in ottica di fabbricazione digitale, la modalità semicircolare è in genere più vantaggiosa, perché si adatta meglio alle capacità native delle macchine CNC di eseguire archi tramite movimenti G2 e G3, cioè comandi di interpolazione circolare, invece di approssimare tutto con segmenti lineari G1.
+La modalità ellittica è interessante perché in alcuni casi produce pattern visivamente più fluidi.
+In ottica di fabbricazione digitale, la modalità semicircolare è in genere più vantaggiosa, perché si adatta meglio alle capacità native delle macchine a controllo numerico (CNC) di eseguire archi tramite movimenti G2 e G3, cioè comandi di interpolazione circolare, invece di approssimare tutto con segmenti lineari G1.
 
 Questo, almeno dal punto di vista implementativo, dovrebbe portare a file più compatti, programmi più brevi e tempi di esecuzione potenzialmente inferiori.
 
-Dopo aver consegnato la tesi, ho fatto una prova preliminare sul cubo confrontando le due modalità. In termini di numero di istruzioni macchina, la modalità semicircle produce un file molto più compatto, con circa 790 istruzioni, contro circa 2700 nella modalità elliptic con ellipse ratio 0.65.
-
-Tuttavia, nel test effettuato, il tempo complessivo di incisione è risultato leggermente inferiore per la modalità elliptic: circa 1 minuto e 56 secondi, contro 2 minuti e 3 secondi per la modalità semicircle.
-
-È un risultato che richiede ulteriori verifiche, perché mostra che la dimensione del file e il numero di istruzioni non si traducono necessariamente in modo diretto nel tempo totale di lavorazione.
-
-Secondo me questo è interessante proprio perché fa capire che non esiste una configurazione universalmente migliore: bisogna sempre valutare insieme forma del pattern, modalità geometrica e comportamento della macchina.”
+Ho effettuato prove preliminari sul cubo, mettendo in confronto le due modalità. In termini di numero di istruzioni macchina, la modalità semicircle produce un file molto più compatto, con circa 790 istruzioni, contro circa 2700 nella modalità elliptic con ellipse ratio impostato a 0.65 (l'eccentricità di un'ellisse è un termine che misura quanto l'ellisse è schiacciata rispetto ai suoi assi).
 
 Slide 9 — Risultati qualitativi
 
-Tempo: circa 2 minuti e 10
-
-“In questa slide mostro alcuni risultati qualitativi su casi diversi, in particolare il cubo e il d20.
+In questa slide mostro alcuni risultati qualitativi su casi diversi, in particolare il cubo e il d20.
 
 Qui entra in gioco anche la parte di validazione tramite strumenti esterni. In particolare ho usato Blender e CutViewer, che hanno ruoli diversi.
 
@@ -152,25 +114,27 @@ Questa parte, secondo me, è stata importante perché mi ha permesso non solo di
 
 Slide 10 — Setup sperimentale e prove di incisione
 
-Tempo: circa 1 minuto e 20
+Dopo la parte di simulazione e validazione qualitativa, ho svolto anche alcune prove preliminari di incisione reale, e in questa slide mostro il setup sperimentale utilizzato.
 
-“Dopo la parte di simulazione e validazione qualitativa, ho svolto anche alcune prove preliminari di incisione reale, e in questa slide mostro il setup sperimentale utilizzato.
-
-La macchina impiegata è una VEVOR CNC Router a 3 assi, con mandrino da 300 watt e controllo GRBL, equipaggiata con una punta diamantata da 60 gradi.
+La macchina impiegata è una VEVOR CNC Router a 3 assi, con mandrino da 300 watt che alla fine non ho utilizzato e controllo GRBL, equipaggiata con una punta diamantata da 60 gradi.
+Punte da 90 o 120 gradi avrebbero prodotto graffi troppo larghi.
 
 I materiali testati sono stati soprattutto acrilico nero riflettente e alluminio. Nella foto a destra si vede la macchina durante una prova di incisione.
 
 Questi test mi sono serviti per verificare quanto il passaggio dal pattern digitale alla lavorazione reale fosse sensibile non solo alla geometria generata dal software, ma anche a fattori pratici come il materiale, la planarità della superficie e la profondità del graffio.
 
-Le profondità usate sono state circa meno 0,02 millimetri su acrilico e circa meno 0,1 su alluminio.
+Le profondità usate sono state circa meno 0,02 millimetri su acrilico per cercare di essere il più precisi possibili e circa meno 0,1 su alluminio, dove la profondità del graffio incide meno.
 
-Come mostro nella slide successiva, proprio queste prove hanno evidenziato alcuni limiti pratici molto interessanti, soprattutto nel caso dell’acrilico.”
+
+Tornando al confronto tra la modalità a semicerchio e quella ellittica, durante le prove di incisione il tempo complessivo è risultato in realtà molto simile nei due casi.
+
+È un risultato che richiede ulteriori verifiche, perché mostra che la dimensione del file e il numero di istruzioni non si traducono necessariamente in modo diretto nel tempo totale di lavorazione.
+
+Secondo me questo è interessante proprio perché fa capire che non esiste una configurazione universalmente migliore: bisogna sempre valutare insieme forma del pattern, modalità geometrica e comportamento della macchina.
 
 Slide 11 — Limiti attuali e sviluppi futuri
 
-Tempo: circa 2 minuti e 30
-
-“Questa slide raccoglie i limiti principali del lavoro e anche i possibili sviluppi futuri.
+Questa slide raccoglie i limiti principali del lavoro e anche i possibili sviluppi futuri.
 
 Il primo limite è che la pipeline modella bene il problema dal punto di vista geometrico, ma non descrive in modo fisicamente completo il comportamento reale della luce sul materiale inciso.
 
@@ -190,14 +154,11 @@ Ho fatto però anche prove su pannelli di alluminio, e lì i risultati sono stat
 
 Per questo motivo, oggi direi che i risultati sono promettenti ma non conclusivi: le simulazioni, in particolare quelle in Blender, restano più leggibili e controllabili, mentre la fabbricazione reale apre problemi pratici molto interessanti, soprattutto legati al materiale e al controllo della profondità di incisione.
 
-Ed è proprio qui che vedo gli sviluppi futuri più interessanti: migliorare il culling, rendere il campionamento più adattivo, ottimizzare il toolpath e soprattutto fare più test fisici con setup meccanici più adatti.”
+Ed è proprio qui che vedo gli sviluppi futuri più interessanti: migliorare il culling, rendere il campionamento più adattivo, ottimizzare il toolpath e soprattutto fare più test fisici con setup meccanici più adatti.
 
 Slide 12 — Grazie
-
-Tempo: circa 45 secondi
-
-“Per concludere, quello che considero più importante di questo lavoro è aver reso esplicito un processo che spesso rimane implicito: il passaggio da una geometria tridimensionale a un pattern inciso controllabile, osservabile e verificabile.
+Per concludere, quello che considero più importante di questo lavoro è aver reso esplicito un processo che spesso rimane implicito: il passaggio da una geometria tridimensionale a un pattern inciso controllabile, osservabile e verificabile.
 
 La tesi non pretende di risolvere in modo definitivo il problema degli scratch hologram, ma propone una base software chiara e analizzabile, su cui è possibile continuare a lavorare.
 
-Vi ringrazio per l’attenzione e resto a disposizione per eventuali domande.”
+Vi ringrazio per l’attenzione e resto a disposizione per eventuali domande.

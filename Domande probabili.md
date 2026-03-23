@@ -124,3 +124,8 @@ Le librerie mi hanno dato strumenti di base, come caricamento mesh e algebra num
 Hai usato strumenti di AI o generazione assistita nello sviluppo?
 
 Ho usato strumenti di supporto allo sviluppo come aiuto alla programmazione e alla prototipazione, ma le scelte progettuali, la verifica dei risultati e l’integrazione finale nella pipeline sono state parte del lavoro di tesi.
+
+
+"CHE VUOL DIRE FABBRICAZIONE DIGITALE?"
+
+La parola fabbricazione digitale (o digital fabrication, o fabbing) fa riferimento al processo attraverso cui è possibile creare oggetti solidi e tridimensionali partendo da disegni digitali. Questo processo, utilizzato ampiamente in manifattura per la creazione rapida di modelli e prototipi, può sfruttare diverse tecniche di fabbricazione sia additive (come la stampa 3D), sia sottrattive come il taglio laser e la fresatura.
