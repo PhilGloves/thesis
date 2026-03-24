@@ -1,9 +1,7 @@
 Slide 1 — Titolo
 
 Buongiorno a tutti, sono Filippo Guanti e oggi vi presento il mio lavoro di tesi, intitolato Pipeline computazionale per la fabbricazione digitale di scratch hologram: dal modello 3D al G-code.
-Questo lavoro nasce dall’interesse per gli scratch hologram, cioè immagini incise su superfici riflettenti che possono produrre un’illusione di profondità.
-Dal punto di vista informatico, la domanda che mi interessava affrontare era come passare da un modello tridimensionale, descritto come mesh triangolare, cioè una geometria 3D approssimata tramite un insieme di triangoli, a un pattern bidimensionale controllabile, visualizzabile ed esportabile.
-Quindi il punto centrale della tesi è stato capire come trasformare una forma 3D in un insieme di traiettorie 2D che mantenessero una relazione leggibile con il modello di partenza.
+La tesi riguarda la generazione di scratch hologram a partire da modelli tridimensionali, con l’obiettivo di costruire una pipeline software capace di trasformare una geometria 3D in un pattern bidimensionale di incisione.
 
 Slide 2 — Contesto e obiettivo
 
@@ -13,13 +11,11 @@ Dal punto di vista informatico, questo porta a un problema interessante: come si
 L’obiettivo della tesi è stato quindi progettare una pipeline riproducibile, con preview interattiva e validazione qualitativa.
 È importante chiarire che il focus del lavoro non è stato costruire una simulazione ottica completa del fenomeno, ma definire una pipeline geometrica coerente, in cui fosse possibile controllare i parametri principali e osservare in modo chiaro il loro effetto sul pattern finale.
 
-Questa impostazione mi ha permesso di concentrarmi soprattutto sulla struttura del processo: input 3D, trasformazioni geometriche, generazione del pattern, preview, esportazione e verifica dei risultati.”
-
 Slide 3 — Dallo stato dell’arte alla proposta
 
 Innanzitutto ho iniziato il mio lavoro di tesi ricercando e analizzando alcune soluzioni esistenti.
 
-In particolare, ho preso come riferimento HoloZens, che è una fork di un progetto originariamente sviluppato da Mike Miller. A sua volta, quel lavoro riprendeva idee e principi già presenti anche in risorse amatoriali storiche dedicate agli scratch hologram, come il sito di Amasci, del ricercatore William J. Beaty, un Ingegnere ricercatore americano che aveva investigato sul fenomeno già a partire dal 1994.
+In particolare, ho preso come riferimento HoloZens, che è una fork di un progetto originariamente sviluppato da Mike Miller. Quel lavoro riprendeva a sua volta idee e principi già presenti anche in risorse storiche dedicate agli scratch hologram, come i paper di William J. Beaty, un Ingegnere ricercatore americano che aveva investigato sul fenomeno già a partire dal 1994.
 
 Questo passaggio è stato utile perché mi ha permesso di capire come altri autori avevano affrontato il problema della trasformazione di una geometria 3D in uno scratch pattern.
 
@@ -29,15 +25,15 @@ A quel punto ho preferito reimpostare la pipeline in un ambiente più adatto all
 
 Rispetto al C#, usato nel progetto originale, Python mi permetteva di testare più rapidamente le modifiche e di sfruttare librerie numeriche molto potenti, come NumPy, utili per lavorare su trasformazioni geometriche e algoritmi visivi senza dover costruire tutto da zero.
 
-Quindi la proposta della tesi nasce proprio da questo: partire dallo stato dell’arte esistente, capirne i punti forti e i limiti, e costruire una pipeline più chiara, controllabile e più adatta a essere analizzata e validata in un contesto accademico.”
+Quindi la proposta della tesi nasce proprio da questo: partire dallo stato dell’arte esistente, capirne i punti forti e i limiti, e costruire una pipeline più chiara, controllabile e adatta alla validazione.
 
 Slide 4 — Pipeline proposta
 
 Si parte da un input in formato STL. Da lì vengono estratti gli spigoli rilevanti della mesh, che poi vengono campionati lungo la loro lunghezza. I punti campionati vengono proiettati secondo una configurazione di vista scelta dall’utente e successivamente sottoposti a una fase di culling. Qui il culling è semplicemente un filtraggio che serve a scartare i punti che, rispetto alla vista scelta, risultano nascosti o comunque non utili alla costruzione del pattern finale.
 
 A partire da questi dati viene poi generato il pattern sotto forma di archi nel piano bidimensionale. Questo pattern può essere visualizzato in preview e poi esportato.
-Qui il punto importante è che il risultato della pipeline non è prima di tutto un render o una semplice immagine, ma una struttura geometrica vera e propria, fatta di archi ed elementi geometrici espliciti, che può poi essere visualizzata ed esportata.
-Questo rende il processo più leggibile e più facilmente controllabile.
+
+
 Inoltre, ogni passaggio dipende dai precedenti: se cambia la vista, cambia la proiezione; se cambia il campionamento, cambia il numero di archi; se cambia il filtraggio di visibilità, cambia il contenuto stesso del pattern.
 
 Slide 5 — Dal modello 3D al pattern di graffi
@@ -45,11 +41,9 @@ Questa slide riassume in modo molto sintetico la parte centrale del lavoro svilu
 
 A sinistra si vede il modello 3D di partenza; al centro una rappresentazione semplificata degli spigoli con i punti campionati lungo di essi; a destra il pattern finale di graffi, cioè l’insieme di archi bidimensionali generati dalla pipeline.
 
-Il software non si limita a visualizzare il modello, ma lo trasforma in una struttura 2D utilizzabile per la preview e per l’esportazione.
+Il punto chiave è che il software non produce semplicemente un’immagine del modello, ma costruisce una rappresentazione geometrica bidimensionale derivata dalla sua forma e dalla configurazione di vista.
 
-In altre parole, questa è la funzione principale della pipeline che ho sviluppato: prendere una mesh 3D, selezionare gli elementi geometrici più rilevanti, campionarli e convertirli in traiettorie bidimensionali leggibili.
-
-Qui non entro nei dettagli tecnici, ma il messaggio che volevo far passare è proprio questo: dal modello tridimensionale si arriva a un pattern di graffi controllabile, che costituisce la base dello scratch hologram.
+Questa trasformazione costituisce il cuore del lavoro svolto nella tesi: passare da una mesh 3D a un pattern di graffi controllabile, visualizzabile ed esportabile.
 
 Slide 6 — Software sviluppato
 
@@ -96,23 +90,33 @@ Questo, almeno dal punto di vista implementativo, dovrebbe portare a file più c
 
 Ho effettuato prove preliminari sul cubo, mettendo in confronto le due modalità. In termini di numero di istruzioni macchina, la modalità semicircle produce un file molto più compatto, con circa 790 istruzioni, contro circa 2700 nella modalità elliptic con ellipse ratio impostato a 0.65 (l'eccentricità di un'ellisse è un termine che misura quanto l'ellisse è schiacciata rispetto ai suoi assi).
 
-Slide 9 — Risultati qualitativi
+Slide 9 — Validazione visiva in Blender
 
-In questa slide mostro alcuni risultati qualitativi su casi diversi, in particolare il cubo e il d20.
+In questa slide mostro la parte di validazione visiva svolta in Blender.
 
-Qui entra in gioco anche la parte di validazione tramite strumenti esterni. In particolare ho usato Blender e CutViewer, che hanno ruoli diversi.
+Blender è stato utile come ambiente di simulazione, perché mi ha permesso di importare i pattern esportati come file di grafica vettoriale bidimensionale e osservarli in un contesto di rendering.
 
-Blender è stato utile come ambiente di simulazione visiva. Mi ha permesso di importare i pattern esportati come file di grafica vettoriale bidimensionale e osservarli in un contesto di rendering, quindi di verificare meglio la distribuzione delle traiettorie, la leggibilità complessiva e la percezione della struttura geometrica.
+Questo mi ha aiutato soprattutto a verificare tre aspetti: la distribuzione delle traiettorie, la leggibilità complessiva del pattern e la percezione della struttura geometrica del modello di partenza.
 
-CutViewer invece è stato usato per simulare il toolpath CNC, cioè il percorso utensile che la macchina seguirebbe durante l’incisione. In questo caso la verifica non riguardava tanto l’effetto visivo finale, quanto la plausibilità della traiettoria macchina generata dalla pipeline.
+Qui mostro in particolare i casi del cubo e del d20, che sono stati i casi di studio principali. Il cubo è utile perché è molto semplice e consente di valutare bene la coerenza del pattern. Il d20 invece introduce una complessità maggiore e permette di vedere come la pipeline si comporta su una geometria meno banale.
 
-Nei casi mostrati qui si vede che il sistema funziona meglio su modelli semplici o moderatamente complessi, mentre su geometrie molto più dense o ricche di dettagli il pattern tende a diventare più difficile da leggere.
+Questa fase è stata importante perché mi ha permesso di capire non solo se il pattern veniva generato correttamente, ma anche se risultava visivamente plausibile e leggibile.
 
-Per esempio, su un oggetto architettonico molto complesso come la Mole, o comunque su modelli di quel tipo, la pipeline tenderebbe probabilmente a generare un pattern molto più affollato e difficile da interpretare localmente.
 
-Questa parte, secondo me, è stata importante perché mi ha permesso non solo di vedere se la pipeline produceva un risultato, ma anche di confrontare diverse rappresentazioni dello stesso pattern e capire in quali casi il metodo risultava più convincente.”
+Slide 10 — Validazione del toolpath in CutViewer
+Il passaggio successivo è stato invece verificare cosa succede quando quel pattern viene reinterpretato come percorso macchina.
 
-Slide 10 — Setup sperimentale e prove di incisione
+In questa slide mostro invece la validazione tramite CutViewer.
+
+A differenza di Blender, qui l’obiettivo non era osservare il pattern dal punto di vista visivo, ma simulare il toolpath CNC, cioè il percorso utensile che la macchina seguirebbe durante l’incisione.
+
+CutViewer mi ha permesso quindi di controllare in modo qualitativo se il G-code generato dalla pipeline producesse una traiettoria plausibile e coerente con il pattern di partenza.
+
+In altre parole, questa fase non serviva tanto a capire se il risultato fosse ‘bello’ visivamente, ma se il passaggio dal pattern geometrico al percorso macchina fosse credibile.
+
+Questa verifica è stata utile perché ha aggiunto un livello ulteriore di controllo: non solo la simulazione visiva del pattern, ma anche una simulazione della sua possibile esecuzione su macchina.
+
+Slide 11 — Setup sperimentale e prove di incisione
 
 Dopo la parte di simulazione e validazione qualitativa, ho svolto anche alcune prove preliminari di incisione reale, e in questa slide mostro il setup sperimentale utilizzato.
 
@@ -132,7 +136,7 @@ Tornando al confronto tra la modalità a semicerchio e quella ellittica, durante
 
 Secondo me questo è interessante proprio perché fa capire che non esiste una configurazione universalmente migliore: bisogna sempre valutare insieme forma del pattern, modalità geometrica e comportamento della macchina.
 
-Slide 11 — Limiti attuali e sviluppi futuri
+Slide 12 — Limiti attuali e sviluppi futuri
 
 Questa slide raccoglie i limiti principali del lavoro e anche i possibili sviluppi futuri.
 
@@ -156,7 +160,7 @@ Per questo motivo, oggi direi che i risultati sono promettenti ma non conclusivi
 
 Ed è proprio qui che vedo gli sviluppi futuri più interessanti: migliorare il culling, rendere il campionamento più adattivo, ottimizzare il toolpath e soprattutto fare più test fisici con setup meccanici più adatti.
 
-Slide 12 — Grazie
+Slide 13 — Grazie
 Per concludere, quello che considero più importante di questo lavoro è aver reso esplicito un processo che spesso rimane implicito: il passaggio da una geometria tridimensionale a un pattern inciso controllabile, osservabile e verificabile.
 
 La tesi non pretende di risolvere in modo definitivo il problema degli scratch hologram, ma propone una base software chiara e analizzabile, su cui è possibile continuare a lavorare.
