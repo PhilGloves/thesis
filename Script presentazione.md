@@ -25,15 +25,12 @@ A quel punto ho preferito reimpostare la pipeline in un ambiente più adatto all
 
 Rispetto al C#, usato nel progetto originale, Python mi permetteva di testare più rapidamente le modifiche e di sfruttare librerie numeriche molto potenti, come NumPy, utili per lavorare su trasformazioni geometriche e algoritmi visivi senza dover costruire tutto da zero.
 
-Quindi la proposta della tesi nasce proprio da questo: partire dallo stato dell’arte esistente, capirne i punti forti e i limiti, e costruire una pipeline più chiara, controllabile e adatta alla validazione.
 
 Slide 4 — Pipeline proposta
 
 Si parte da un input in formato STL. Da lì vengono estratti gli spigoli rilevanti della mesh, che poi vengono campionati lungo la loro lunghezza. I punti campionati vengono proiettati secondo una configurazione di vista scelta dall’utente e successivamente sottoposti a una fase di culling. Qui il culling è semplicemente un filtraggio che serve a scartare i punti che, rispetto alla vista scelta, risultano nascosti o comunque non utili alla costruzione del pattern finale.
 
 A partire da questi dati viene poi generato il pattern sotto forma di archi nel piano bidimensionale. Questo pattern può essere visualizzato in preview e poi esportato.
-
-
 Inoltre, ogni passaggio dipende dai precedenti: se cambia la vista, cambia la proiezione; se cambia il campionamento, cambia il numero di archi; se cambia il filtraggio di visibilità, cambia il contenuto stesso del pattern.
 
 Slide 5 — Dal modello 3D al pattern di graffi
@@ -42,8 +39,6 @@ Questa slide riassume in modo molto sintetico la parte centrale del lavoro svilu
 A sinistra si vede il modello 3D di partenza; al centro una rappresentazione semplificata degli spigoli con i punti campionati lungo di essi; a destra il pattern finale di graffi, cioè l’insieme di archi bidimensionali generati dalla pipeline.
 
 Il punto chiave è che il software non produce semplicemente un’immagine del modello, ma costruisce una rappresentazione geometrica bidimensionale derivata dalla sua forma e dalla configurazione di vista.
-
-Questa trasformazione costituisce il cuore del lavoro svolto nella tesi: passare da una mesh 3D a un pattern di graffi controllabile, visualizzabile ed esportabile.
 
 Slide 6 — Software sviluppato
 
@@ -81,14 +76,14 @@ Questa slide mostra in modo abbastanza chiaro quanto il pattern dipenda dai para
 
 Il primo parametro importante è l’angolo di vista. Cambiando la vista, cambia la proiezione della mesh e quindi cambia anche il pattern risultante. Questo è naturale, ma è importante vederlo in modo esplicito, perché significa che la vista non è un dettaglio secondario: fa parte del comportamento stesso del sistema.
 
-Il secondo aspetto importante è la modalità di generazione degli archi. Nella pipeline ho considerato sia una modalità semicircle, più semplice e regolare, sia una modalità elliptic, che introduce traiettorie più morbide e continue.
+Il secondo aspetto importante è la modalità di generazione degli archi. Nella pipeline ho considerato sia una modalità semicerchia, più semplice e regolare, sia una modalità ellittica, che introduce traiettorie più morbide e continue.
 
 La modalità ellittica è interessante perché in alcuni casi produce pattern visivamente più fluidi.
 In ottica di fabbricazione digitale, la modalità semicircolare è in genere più vantaggiosa, perché si adatta meglio alle capacità native delle macchine a controllo numerico (CNC) di eseguire archi tramite movimenti G2 e G3, cioè comandi di interpolazione circolare, invece di approssimare tutto con segmenti lineari G1.
 
 Questo, almeno dal punto di vista implementativo, dovrebbe portare a file più compatti, programmi più brevi e tempi di esecuzione potenzialmente inferiori.
 
-Ho effettuato prove preliminari sul cubo, mettendo in confronto le due modalità. In termini di numero di istruzioni macchina, la modalità semicircle produce un file molto più compatto, con circa 790 istruzioni, contro circa 2700 nella modalità elliptic con ellipse ratio impostato a 0.65 (l'eccentricità di un'ellisse è un termine che misura quanto l'ellisse è schiacciata rispetto ai suoi assi).
+Ho effettuato prove preliminari sul cubo, mettendo in confronto le due modalità. In termini di numero di istruzioni macchina, la modalità semicerchio produce un file molto più compatto, con circa 790 istruzioni, contro circa 2700 nella modalità ellittica con ellipse ratio impostato a 0.65 (l'eccentricità di un'ellisse è un termine che misura quanto l'ellisse è schiacciata rispetto ai suoi assi).
 
 Slide 9 — Validazione visiva in Blender
 
@@ -98,7 +93,7 @@ Blender è stato utile come ambiente di simulazione, perché mi ha permesso di i
 
 Questo mi ha aiutato soprattutto a verificare tre aspetti: la distribuzione delle traiettorie, la leggibilità complessiva del pattern e la percezione della struttura geometrica del modello di partenza.
 
-Qui mostro in particolare i casi del cubo e del d20, che sono stati i casi di studio principali. Il cubo è utile perché è molto semplice e consente di valutare bene la coerenza del pattern. Il d20 invece introduce una complessità maggiore e permette di vedere come la pipeline si comporta su una geometria meno banale.
+Qui mostro in particolare i casi del cubo e del d20, che sono stati i casi di studio principali. Il cubo è utile perché è molto semplice e consente di valutare bene la coerenza del pattern. Il d20 invece introduce una complessità maggiore e permette di vedere come il software si comporta su una geometria meno banale.
 
 Questa fase è stata importante perché mi ha permesso di capire non solo se il pattern veniva generato correttamente, ma anche se risultava visivamente plausibile e leggibile.
 
@@ -108,9 +103,9 @@ Il passaggio successivo è stato invece verificare cosa succede quando quel patt
 
 In questa slide mostro invece la validazione tramite CutViewer.
 
-A differenza di Blender, qui l’obiettivo non era osservare il pattern dal punto di vista visivo, ma simulare il toolpath CNC, cioè il percorso utensile che la macchina seguirebbe durante l’incisione.
+A differenza di Blender, qui l’obiettivo non era osservare il pattern dal punto di vista visivo, ma simulare il percorso CNC che la macchina seguirebbe durante l’incisione.
 
-CutViewer mi ha permesso quindi di controllare in modo qualitativo se il G-code generato dalla pipeline producesse una traiettoria plausibile e coerente con il pattern di partenza.
+CutViewer mi ha permesso quindi di controllare in modo qualitativo se il G-code generato dal software producesse una traiettoria plausibile e coerente con il pattern di partenza.
 
 In altre parole, questa fase non serviva tanto a capire se il risultato fosse ‘bello’ visivamente, ma se il passaggio dal pattern geometrico al percorso macchina fosse credibile.
 
@@ -127,8 +122,7 @@ I materiali testati sono stati soprattutto acrilico nero riflettente e alluminio
 
 Questi test mi sono serviti per verificare quanto il passaggio dal pattern digitale alla lavorazione reale fosse sensibile non solo alla geometria generata dal software, ma anche a fattori pratici come il materiale, la planarità della superficie e la profondità del graffio.
 
-Le profondità usate sono state circa meno 0,02 millimetri su acrilico per cercare di essere il più precisi possibili e circa meno 0,1 su alluminio, dove la profondità del graffio incide meno.
-
+Le profondità usate sono state circa meno 0,02 millimetri su acrilico per cercare di essere il più precisi possibili e circa meno 0,1 su alluminio, dove la profondità del graffio è meno importante ai fini del risultato.
 
 Tornando al confronto tra la modalità a semicerchio e quella ellittica, durante le prove di incisione il tempo complessivo è risultato in realtà molto simile nei due casi.
 
