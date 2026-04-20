@@ -17,7 +17,7 @@ derived from the same current camera view.
 
 Key parameters
 --------------
-`line_resolution` controls edge sampling density, `view_angle` controls the
+`line_resolution` controls hybrid sampling density/thinning, `view_angle` controls the
 simulated profile overlay, `arc_mode` selects semicircular or elliptic arc
 generation, and the camera yaw/pitch/zoom determine the projection.
 
@@ -32,7 +32,10 @@ geometry to avoid mismatches between preview and fabrication.
 
 from __future__ import annotations
 
+import concurrent.futures
 import math
+import os
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -46,12 +49,14 @@ from scratch_pipeline import (
     CameraConfig,
     Edge,
     build_sample_visibility_lookup,
+    compute_arc_depth_scale,
     build_model_to_view_matrix,
     build_model_to_window_matrix,
     build_model_vertices_and_edges,
     ensure_dependencies,
     generate_arcs,
     load_mesh,
+    merge_arc_lists,
     model_to_window,
     write_svg,
 )
@@ -91,6 +96,7 @@ def point_at_angle_projected(
     p: np.ndarray | tuple[float, float, float],
     angle_deg: float,
     n_view: float,
+    arc_depth_scale: float = 1.0,
     ellipse_ratio: float = 1.0,
 ) -> tuple[float, float]:
     """
@@ -104,6 +110,9 @@ def point_at_angle_projected(
         Simulated profile angle in degrees.
     n_view : float
         Projected depth of the camera target point.
+    arc_depth_scale : float, optional
+        Per-view gain applied to the projected depth offset so simulated motion
+        follows the same normalized arc family used by generation.
     ellipse_ratio : float, optional
         Vertical scaling factor for elliptic profile motion.
 
@@ -123,7 +132,7 @@ def point_at_angle_projected(
     -----------
     `angle_deg` is interpreted in the interval `[-90, 90]`.
     """
-    dist = float(p[2]) - n_view
+    dist = (float(p[2]) - n_view) * float(arc_depth_scale)
     cx = float(p[0])
     cy = float(p[1]) - dist / 2.0
     r = abs(dist) / 2.0
@@ -515,6 +524,69 @@ def estimate_gcode_footprint_mm(arcs: list[Arc], target_width_mm: float) -> tupl
     return float(target_width_mm), float(height_u * mm_per_unit)
 
 
+def _split_edges(edges: list[Edge], n: int) -> list[list[Edge]]:
+    if n <= 1 or len(edges) <= n:
+        return [edges]
+    chunk_size = math.ceil(len(edges) / n)
+    return [edges[i : i + chunk_size] for i in range(0, len(edges), chunk_size)]
+
+
+def _visibility_worker(
+    model_vertices: np.ndarray,
+    faces: np.ndarray,
+    edges: list[Edge],
+    camera: CameraConfig,
+    view_points_per_unit_length: float,
+    write_debug_pngs: bool,
+) -> dict[int, np.ndarray] | None:
+    sample_visibility, _ = build_sample_visibility_lookup(
+        model_vertices=model_vertices,
+        edges=edges,
+        faces=faces,
+        camera=camera,
+        view_points_per_unit_length=view_points_per_unit_length,
+        zbuffer_resolution=1024,
+        coverage_dilation_size=3,
+        sample_window_size=5,
+        debug_output_prefix=(
+            Path(__file__).resolve().with_name("visibility_debug")
+            if write_debug_pngs else None
+        ),
+    )
+    return sample_visibility
+
+
+def _arc_chunk_worker(
+    model_vertices: np.ndarray,
+    zero_vertices: np.ndarray,
+    edges_chunk: list[Edge],
+    effective_lr: float,
+    n_view: float,
+    min_arc_radius: float,
+    arc_mode: str,
+    ellipse_ratio: float,
+    mtx: np.ndarray,
+    view_mtx: np.ndarray,
+    sample_visibility: dict[int, np.ndarray] | None,
+    arc_depth_scale_multiplier: float = 1.0,
+) -> list[Arc]:
+    return generate_arcs(
+        model_vertices=model_vertices,
+        zero_vertices=zero_vertices,
+        edges=edges_chunk,
+        view_points_per_unit_length=effective_lr,
+        n_view=n_view,
+        dedupe_decimals=6,
+        min_arc_radius=min_arc_radius,
+        arc_mode=arc_mode,
+        ellipse_ratio=ellipse_ratio,
+        model_to_window_mtx=mtx,
+        model_to_view_mtx=view_mtx,
+        sample_visibility_by_edge=sample_visibility,
+        arc_depth_scale_multiplier=arc_depth_scale_multiplier,
+    )
+
+
 class ScratchDesktopApp:
     """
     Interactive desktop controller for mesh loading, projection, and export.
@@ -579,6 +651,7 @@ class ScratchDesktopApp:
         self.last_sampled_edges: list[Edge] = []
         self.last_projected: np.ndarray | None = None
         self.last_n_view: float = 0.0
+        self.last_arc_depth_scale: float = 1.0
         self.last_edge_stride: int = 1
         self.last_preview_lr: float = 0.0
         self.last_mode: str = "IDLE"
@@ -595,6 +668,8 @@ class ScratchDesktopApp:
         self.drag_last_x = 0
         self.drag_last_y = 0
         self.pending_recompute: str | None = None
+        _cpu_count = os.cpu_count() or 1
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=_cpu_count)
 
         self.line_resolution = tk.DoubleVar(value=3.28)
         # Keep these fixed to simplify the UI and avoid unnecessary tuning knobs.
@@ -607,6 +682,7 @@ class ScratchDesktopApp:
         self.arc_limit = tk.IntVar(value=6000)
         self.preview_quality = tk.IntVar(value=55)
         self.view_angle = tk.DoubleVar(value=0.0)
+        self.arc_depth_scale = tk.DoubleVar(value=1.0)
         self.arc_mode = tk.StringVar(value="Semicircle (CNC)")
         self.ellipse_ratio = tk.DoubleVar(value=0.65)
         self.show_arcs = tk.BooleanVar(value=True)
@@ -661,7 +737,7 @@ class ScratchDesktopApp:
             controls,
             row=0,
             col=0,
-            label="Line resolution",
+            label="Arc density",
             variable=self.line_resolution,
             min_val=0.2,
             max_val=12.0,
@@ -719,8 +795,18 @@ class ScratchDesktopApp:
             max_val=1.00,
             fmt="{:.2f}",
         )
+        self._make_slider(
+            controls,
+            row=2,
+            col=0,
+            label="Depth",
+            variable=self.arc_depth_scale,
+            min_val=0.1,
+            max_val=3.0,
+            fmt="{:.2f}",
+        )
         checkbox_row = ttk.Frame(controls)
-        checkbox_row.grid(row=2, column=0, columnspan=3, padx=8, pady=4, sticky="w")
+        checkbox_row.grid(row=3, column=0, columnspan=3, padx=8, pady=4, sticky="w")
         ttk.Checkbutton(
             checkbox_row,
             text="Show arcs",
@@ -1213,6 +1299,7 @@ class ScratchDesktopApp:
             n_view = float(pr_view[2])
             self.last_projected = projected
             self.last_n_view = n_view
+            self.last_arc_depth_scale = compute_arc_depth_scale(projected, n_view)
         except Exception as exc:
             self.status_var.set(f"Errore proiezione: {exc}")
             return
@@ -1226,33 +1313,119 @@ class ScratchDesktopApp:
         self.last_preview_lr = effective_lr
         self.last_mode = "FAST" if interactive else "PREVIEW"
 
-        try:
-            zero_vertices = projected
-            sample_visibility = self._visibility_sample_lookup(
-                edges_for_cull=sampled_edges,
-                view_points_per_unit_length=effective_lr,
-                camera=camera,
-                write_debug_pngs=not interactive,
-            )
-            self.current_arcs = generate_arcs(
-                model_vertices=self.model_vertices,
-                zero_vertices=zero_vertices,
-                edges=sampled_edges,
-                view_points_per_unit_length=effective_lr,
-                n_view=n_view,
-                dedupe_decimals=6,
-                min_arc_radius=float(self.fixed_min_arc_radius),
-                arc_mode=self._current_arc_mode(),
-                ellipse_ratio=self._current_ellipse_ratio(),
-                model_to_window_mtx=mtx,
-                model_to_view_mtx=view_mtx,
-                sample_visibility_by_edge=sample_visibility,
-            )
-        except Exception as exc:
-            self.status_var.set(f"Errore calcolo archi: {exc}")
-            return
+        zero_vertices = projected
+        arc_mode = self._current_arc_mode()
+        ellipse_ratio = self._current_ellipse_ratio()
+        min_arc_radius = float(self.fixed_min_arc_radius)
+        arc_depth_scale_val = float(self.arc_depth_scale.get())
+        cull_enabled = bool(self.visibility_cull.get())
+        num_workers = max(1, os.cpu_count() or 1)
+        chunks = _split_edges(sampled_edges, num_workers)
 
-        self._draw_scene(draw_limit=draw_limit, interactive=interactive)
+        # Show a lightweight edge skeleton immediately so the user always
+        # sees the model in its current orientation while arcs are computed.
+        self._draw_wireframe(projected, sampled_edges)
+        self.canvas.create_text(
+            20, 50, text="Computing arcs...", anchor="nw", fill="#f4fa25", font=("Segoe UI", 12, "bold"), tags="loading"
+        )
+
+        # Captured for closure use in callbacks running on executor threads.
+        _model_vertices = self.model_vertices
+        _faces = self.faces
+
+        def _submit_arc_chunks(sample_visibility: dict | None) -> None:
+            arc_results: list[list[Arc] | None] = [None] * len(chunks)
+            remaining = [len(chunks)]
+            merge_lock = threading.Lock()
+
+            def _on_chunk_done(future: concurrent.futures.Future, idx: int) -> None:
+                if future.cancelled():
+                    return
+                try:
+                    arc_results[idx] = future.result()
+                except Exception as exc:
+                    arc_results[idx] = []
+                    self.root.after(0, lambda e=exc, i=idx: self.status_var.set(f"Errore calcolo archi (chunk {i}): {e}"))
+                with merge_lock:
+                    remaining[0] -= 1
+                    all_done = remaining[0] == 0
+                if all_done:
+                    def apply() -> None:
+                        if self.pending_recompute is not None:
+                            return
+                        merged = merge_arc_lists([r for r in arc_results if r is not None])
+                        self.current_arcs = merged
+                        self.canvas.delete("all")
+                        self._draw_scene(draw_limit=draw_limit, interactive=interactive)
+                    self.root.after(0, apply)
+
+            for idx, chunk in enumerate(chunks):
+                f = self.executor.submit(
+                    _arc_chunk_worker,
+                    _model_vertices,
+                    zero_vertices,
+                    chunk,
+                    effective_lr,
+                    n_view,
+                    min_arc_radius,
+                    arc_mode,
+                    ellipse_ratio,
+                    mtx,
+                    view_mtx,
+                    sample_visibility,
+                    arc_depth_scale_val,
+                )
+                f.add_done_callback(lambda fut, i=idx: _on_chunk_done(fut, i))
+
+        if cull_enabled and _faces is not None and len(_faces) > 0 and len(sampled_edges) > 0:
+            vis_future = self.executor.submit(
+                _visibility_worker,
+                _model_vertices,
+                _faces,
+                sampled_edges,
+                camera,
+                effective_lr,
+                not interactive,
+            )
+
+            def _on_visibility_done(vf: concurrent.futures.Future) -> None:
+                if vf.cancelled():
+                    return
+                try:
+                    sample_visibility = vf.result()
+                except Exception as exc:
+                    self.root.after(0, lambda e=exc: self.status_var.set(f"Errore visibility cull: {e}"))
+                    sample_visibility = None
+                _submit_arc_chunks(sample_visibility)
+
+            vis_future.add_done_callback(_on_visibility_done)
+        else:
+            _submit_arc_chunks(None)
+
+    def _draw_wireframe(self, projected: np.ndarray, sampled_edges: list[Edge]) -> None:
+        """Draw a thin edge skeleton using the current projection.
+
+        Capped at ~1500 lines so it renders instantly regardless of mesh size.
+        Used as a placeholder while arc generation runs in the background.
+        """
+        if not sampled_edges:
+            return
+        wireframe_max = 1500
+        stride = max(1, len(sampled_edges) // wireframe_max)
+        for edge in sampled_edges[::stride]:
+            p1 = projected[edge.start_idx]
+            p2 = projected[edge.end_idx]
+            if not (
+                math.isfinite(float(p1[0])) and math.isfinite(float(p1[1]))
+                and math.isfinite(float(p2[0])) and math.isfinite(float(p2[1]))
+            ):
+                continue
+            self.canvas.create_line(
+                float(p1[0]), float(p1[1]),
+                float(p2[0]), float(p2[1]),
+                fill="#2e3f52",
+                width=1,
+            )
 
     def _draw_scene(self, draw_limit: int, interactive: bool) -> None:
         if self.last_projected is None or self.model_vertices is None:
@@ -1303,12 +1476,14 @@ class ScratchDesktopApp:
                         p1,
                         angle_deg=angle,
                         n_view=self.last_n_view,
+                        arc_depth_scale=self.last_arc_depth_scale * float(self.arc_depth_scale.get()),
                         ellipse_ratio=profile_ratio,
                     )
                     x2, y2 = point_at_angle_projected(
                         p2,
                         angle_deg=angle,
                         n_view=self.last_n_view,
+                        arc_depth_scale=self.last_arc_depth_scale * float(self.arc_depth_scale.get()),
                         ellipse_ratio=profile_ratio,
                     )
                     self.canvas.create_line(
@@ -1338,7 +1513,7 @@ class ScratchDesktopApp:
                         f"Archi: {len(self.current_arcs)}",
                         f"Preview: {shown_arcs}",
                         f"Q: {int(self.preview_quality.get())}%",
-                        f"LR eff: {self.last_preview_lr:.2f}",
+                        f"Density: {self.last_preview_lr:.2f}",
                         f"Edge step: {self.last_edge_stride}",
                         f"Arc: {arc_mode_status}",
                         f"Cull: {cull_status}",
@@ -1378,6 +1553,38 @@ class ScratchDesktopApp:
         _, _, _, draw_limit = self._preview_params(interactive=False, full_quality=False)
         self._draw_scene(draw_limit=draw_limit, interactive=self.dragging)
 
+    def _visibility_sample_lookup(
+        self,
+        edges_for_cull: list[Edge],
+        view_points_per_unit_length: float,
+        camera: CameraConfig,
+        write_debug_pngs: bool,
+        cull_enabled: bool,
+    ) -> dict[int, np.ndarray] | None:
+        if (
+            not cull_enabled
+            or self.model_vertices is None
+            or self.faces is None
+            or len(self.faces) == 0
+            or len(edges_for_cull) == 0
+        ):
+            return None
+        sample_visibility, _ = build_sample_visibility_lookup(
+            model_vertices=self.model_vertices,
+            edges=edges_for_cull,
+            faces=self.faces,
+            camera=camera,
+            view_points_per_unit_length=view_points_per_unit_length,
+            zbuffer_resolution=1024,
+            coverage_dilation_size=3,
+            sample_window_size=5,
+            debug_output_prefix=(
+                Path(__file__).resolve().with_name("visibility_debug")
+                if write_debug_pngs else None
+            ),
+        )
+        return sample_visibility
+
     def _compute_full_view_data(self) -> tuple[list[Arc], np.ndarray]:
         if self.model_vertices is None:
             raise ValueError("Nessun modello caricato.")
@@ -1404,11 +1611,13 @@ class ScratchDesktopApp:
             ellipse_ratio=self._current_ellipse_ratio(),
             model_to_window_mtx=mtx,
             model_to_view_mtx=view_mtx,
+            arc_depth_scale_multiplier=float(self.arc_depth_scale.get()),
             sample_visibility_by_edge=self._visibility_sample_lookup(
                 edges_for_cull=self.edges,
                 view_points_per_unit_length=float(self.line_resolution.get()),
                 camera=camera,
                 write_debug_pngs=True,
+                cull_enabled=bool(self.visibility_cull.get()),
             ),
         )
         return arcs_full, zero_vertices
@@ -1425,45 +1634,14 @@ class ScratchDesktopApp:
         # Ensure export uses the latest UI parameters (arc mode, ellipse ratio, etc.).
         self._flush_pending_recompute()
 
-        # Always export from preview cache (single source of truth).
-        if self.last_mode == "FAST":
-            # Ensure export never uses temporary low-quality drag state.
-            self.recompute_and_redraw(interactive=False)
-        if self.last_projected is not None and len(self.current_arcs) > 0:
+        # Use preview cache only when it reflects a full-quality (non-drag) computation.
+        # FAST mode arcs are low-resolution drag previews — never safe to export.
+        if self.last_mode != "FAST" and self.last_projected is not None and len(self.current_arcs) > 0:
             return list(self.current_arcs), self.last_projected, "preview"
 
         arcs_full, projected_vertices = self._compute_full_view_data()
         return arcs_full, projected_vertices, "full"
 
-    def _visibility_sample_lookup(
-        self,
-        *,
-        edges_for_cull: list[Edge],
-        view_points_per_unit_length: float,
-        camera: CameraConfig,
-        write_debug_pngs: bool,
-    ) -> dict[int, np.ndarray] | None:
-        if not bool(self.visibility_cull.get()):
-            return None
-        if self.model_vertices is None or self.faces is None or len(self.faces) == 0 or len(edges_for_cull) == 0:
-            return None
-
-        sample_visibility_by_edge, _stats = build_sample_visibility_lookup(
-            model_vertices=self.model_vertices,
-            edges=edges_for_cull,
-            faces=self.faces,
-            camera=camera,
-            view_points_per_unit_length=view_points_per_unit_length,
-            zbuffer_resolution=1024,
-            coverage_dilation_size=3,
-            sample_window_size=5,
-            debug_output_prefix=(
-                Path(__file__).resolve().with_name("visibility_debug")
-                if write_debug_pngs
-                else None
-            ),
-        )
-        return sample_visibility_by_edge
 
     def _prompt_gcode_settings(self, arcs: list[Arc] | None = None) -> dict[str, float | int | bool] | None:
         parent = self.root

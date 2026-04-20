@@ -101,11 +101,12 @@ Note preview:
 
 ## Parametri chiave
 
-- `line-resolution`: densita` di campionamento lungo gli spigoli.
+- `line-resolution`: controllo ibrido della densita` archi; campiona lungo gli spigoli e dirada i seed quasi sovrapposti nelle mesh fitte.
 - `min-arc-radius`: filtro anti micro-archi.
 - `stroke-width`: spessore visuale arco in SVG.
 - `arc-mode`: `semi` oppure `elliptic`.
 - `ellipse-ratio`: rapporto altezza/larghezza dell'arco quando `arc-mode=elliptic`.
+- la dimensione degli archi viene normalizzata automaticamente sulla vista corrente, cosi` modelli diversi mantengono scratch piu` coerenti in export.
 - camera (`po`, `pr`, `look-up`, `zf`, `current-scale`) per la proiezione.
 
 ## Output

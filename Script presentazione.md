@@ -4,7 +4,7 @@ Buongiorno a tutti, sono Filippo Guanti e oggi vi presento il mio lavoro di tesi
 La tesi riguarda la generazione di scratch hologram a partire da modelli tridimensionali, con l’obiettivo di costruire una pipeline software capace di trasformare una geometria 3D in un pattern bidimensionale di incisione.
 
 Slide 2 — Contesto e obiettivo
-
+    
 Gli scratch hologram sono immagini incise su superfici riflettenti che possono produrre un’illusione di profondità. In altre parole, la forma tridimensionale non viene ricostruita come volume reale, ma suggerita attraverso un pattern di incisioni che modifica il modo in cui la luce viene riflessa.
 
 Dal punto di vista informatico, questo porta a un problema interessante: come si può trasformare un modello 3d (sotto forma di file STL) in un pattern 2D che sia abbastanza controllabile da poter essere analizzato, visualizzato e potenzialmente fabbricato?

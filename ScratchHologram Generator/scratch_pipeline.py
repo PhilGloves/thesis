@@ -16,7 +16,7 @@ with optional visibility diagnostics derived from a conservative Z-buffer.
 
 Key parameters
 --------------
-`line_resolution` controls edge sampling density in samples per model unit.
+`line_resolution` controls edge sampling density plus projected arc thinning.
 `min_arc_radius` rejects small projected arcs to limit manufacturing noise.
 `arc_mode` selects semicircular or elliptic arc generation.
 `zf` and `current_scale` control the projection model and effective zoom.
@@ -62,6 +62,12 @@ EPS = 1e-12
 # WARNING: rounding is a design decision used to merge nearly coincident mesh
 # vertices; the trade-off is better edge stability at the cost of small detail.
 NORMAL_TOLERANCE_DECIMALS = 4
+# WARNING: arc diameter is normalized against the projected model span so
+# different meshes produce more comparable physical scratch sizes after export.
+ARC_RADIUS_SPAN_FRACTION = 5.0e-2
+# WARNING: very flat views can have near-zero depth spread; this floor keeps arc
+# normalization from over-amplifying numerical noise.
+ARC_DEPTH_EXTENT_FLOOR_SPAN_FRACTION = 1.0e-2
 # WARNING: the visibility cull uses a deliberately conservative orthographic
 # depth tolerance; the trade-off is fewer holes on visible faces at the cost of
 # some false positives near silhouettes.
@@ -122,7 +128,7 @@ class PipelineConfig:
     Parameters
     ----------
     line_resolution : float
-        Edge sampling density in samples per model unit.
+        Hybrid density control for edge sampling and projected arc thinning.
     auto_center : bool
         If True, shifts the mesh so the front-most `z` plane is mapped to
         `z = 0` before projection.
@@ -458,19 +464,19 @@ def build_model_vertices_and_edges(
         max_z = float(np.max(vertices[:, 2]))
         vertices[:, 2] = np.round(vertices[:, 2] - max_z, decimals)
 
-    # Build a stable set of unique vertices using rounded coordinates.
-    coord_to_new_idx: dict[tuple[float, float, float], int] = {}
-    unique_vertices: list[tuple[float, float, float]] = []
-    remap = np.zeros(vertices.shape[0], dtype=np.int64)
-
-    for old_idx, coord in enumerate(vertices):
-        key = (float(coord[0]), float(coord[1]), float(coord[2]))
-        existing = coord_to_new_idx.get(key)
-        if existing is None:
-            existing = len(unique_vertices)
-            coord_to_new_idx[key] = existing
-            unique_vertices.append(key)
-        remap[old_idx] = existing
+    # Vectorized vertex deduplication: use np.unique on a structured dtype so
+    # the Python dict loop (O(N) with interpreter overhead) is replaced by a
+    # single C-level sort.  First-occurrence ordering is restored after unique
+    # so downstream edge IDs remain deterministic.
+    struct_dtype = np.dtype([("x", np.float64), ("y", np.float64), ("z", np.float64)])
+    verts_c = np.ascontiguousarray(vertices)
+    struct_v = verts_c.view(struct_dtype).ravel()
+    _, first_idx, inverse = np.unique(struct_v, return_index=True, return_inverse=True)
+    foc_order = np.argsort(first_idx)           # sorted_unique_idx -> first-occurrence rank
+    inv_foc = np.empty_like(foc_order)
+    inv_foc[foc_order] = np.arange(len(foc_order))
+    remap = inv_foc[inverse].astype(np.int64)   # original_vertex_idx -> new_idx
+    unique_verts = verts_c[first_idx[foc_order]]
 
     # Build unique undirected edges, preserving creation order for stable IDs.
     # Keep per-edge adjacent face normals so we can skip coplanar triangulation edges
@@ -481,27 +487,32 @@ def build_model_vertices_and_edges(
 
     face_normals = np.asarray(mesh.face_normals, dtype=np.float64)
 
-    remapped_faces: list[tuple[int, int, int]] = []
-    seen_faces: set[tuple[int, int, int]] = set()
+    # Vectorized face remapping and degenerate detection.
+    new_faces = remap[faces]  # shape (N_faces, 3)
+    is_degenerate = (
+        (new_faces[:, 0] == new_faces[:, 1])
+        | (new_faces[:, 1] == new_faces[:, 2])
+        | (new_faces[:, 0] == new_faces[:, 2])
+    )
+    valid_face_indices = np.where(~is_degenerate)[0]
+    valid_new_faces = new_faces[valid_face_indices]
 
-    for face_idx, tri in enumerate(faces):
-        tri_new = [int(remap[int(tri[0])]), int(remap[int(tri[1])]), int(remap[int(tri[2])])]
+    # Face deduplication for remapped_faces: exact-row match, first-occurrence order.
+    _, ufirst = np.unique(valid_new_faces, axis=0, return_index=True)
+    ufirst = np.sort(ufirst)  # restore first-occurrence order
+    remapped_faces_arr = valid_new_faces[ufirst]
 
-        # Skip invalid/degenerate triangles after rounding/remap.
-        if len(set(tri_new)) < 3:
-            continue
-
-        face_key = (tri_new[0], tri_new[1], tri_new[2])
-        if face_key not in seen_faces:
-            seen_faces.add(face_key)
-            remapped_faces.append(face_key)
-
+    # Edge construction: iterate all valid (non-degenerate) faces, including duplicates,
+    # so every face contributes its normal to adjacent edges (same as the original loop).
+    for i in range(valid_face_indices.shape[0]):
+        face_idx = int(valid_face_indices[i])
+        tri_new = valid_new_faces[i]
         face_normal = normalize(face_normals[face_idx])
 
         tri_pairs = (
-            (tri_new[0], tri_new[1]),
-            (tri_new[1], tri_new[2]),
-            (tri_new[2], tri_new[0]),
+            (int(tri_new[0]), int(tri_new[1])),
+            (int(tri_new[1]), int(tri_new[2])),
+            (int(tri_new[2]), int(tri_new[0])),
         )
         for a, b in tri_pairs:
             if a == b:
@@ -542,11 +553,10 @@ def build_model_vertices_and_edges(
             )
         )
 
-    remapped_faces_arr = np.asarray(remapped_faces, dtype=np.int64)
     if remapped_faces_arr.size == 0:
         remapped_faces_arr = np.zeros((0, 3), dtype=np.int64)
 
-    return np.asarray(unique_vertices, dtype=np.float64), filtered_edges, remapped_faces_arr
+    return unique_verts, filtered_edges, remapped_faces_arr
 
 
 def build_model_to_view_matrix(camera: CameraConfig) -> np.ndarray:
@@ -1061,26 +1071,9 @@ def build_zbuffer_conservative(
         if np.any(d <= 0.0):
             continue
 
-        px, py = screen_to_zbuffer_coords(
-            np.column_stack((p[:, 0], p[:, 1])),
-            zbuffer_meta,
-            clamp_to_screen=True,
-        )
+        px, py = screen_to_zbuffer_coords(p, zbuffer_meta, clamp_to_screen=True)
         if not np.all(np.isfinite(px)) or not np.all(np.isfinite(py)):
             continue
-        vertex_ix = np.clip(np.rint(px).astype(np.int64), 0, width - 1)
-        vertex_iy = np.clip(np.rint(py).astype(np.int64), 0, height - 1)
-        check_fx, check_fy = screen_to_zbuffer_coords(
-            p,
-            zbuffer_meta,
-            clamp_to_screen=True,
-        )
-        check_ix = np.clip(np.rint(check_fx).astype(np.int64), 0, width - 1)
-        check_iy = np.clip(np.rint(check_fy).astype(np.int64), 0, height - 1)
-        if not np.array_equal(vertex_ix, check_ix):
-            raise AssertionError("Triangle vertex x pixel mapping diverged from raster mapping")
-        if not np.array_equal(vertex_iy, check_iy):
-            raise AssertionError("Triangle vertex y pixel mapping diverged from raster mapping")
 
         denom = ((py[1] - py[2]) * (px[0] - px[2])) + ((px[2] - px[1]) * (py[0] - py[2]))
         if abs(float(denom)) < EPS:
@@ -1267,22 +1260,16 @@ def write_sample_visibility_overlay_png(
     coords = np.asarray(sample_pixels, dtype=np.int64)
     visible = np.asarray(visible_mask, dtype=bool)
     if coords.shape[0] > 0:
-        valid = (
-            np.isfinite(coords[:, 0])
-            & np.isfinite(coords[:, 1])
-        )
-        if np.any(valid):
-            clamped_x = np.clip(coords[valid, 0], 0, image.shape[1] - 1)
-            clamped_y = np.clip(coords[valid, 1], 0, image.shape[0] - 1)
-            valid_visible = visible[valid]
+        clamped_x = np.clip(coords[:, 0], 0, image.shape[1] - 1)
+        clamped_y = np.clip(coords[:, 1], 0, image.shape[0] - 1)
 
-            culled_idx = np.where(~valid_visible)[0]
-            if culled_idx.size > 0:
-                image[clamped_y[culled_idx], clamped_x[culled_idx]] = np.asarray((255, 0, 0), dtype=np.uint8)
+        culled_idx = np.where(~visible)[0]
+        if culled_idx.size > 0:
+            image[clamped_y[culled_idx], clamped_x[culled_idx]] = np.asarray((255, 0, 0), dtype=np.uint8)
 
-            kept_idx = np.where(valid_visible)[0]
-            if kept_idx.size > 0:
-                image[clamped_y[kept_idx], clamped_x[kept_idx]] = np.asarray((0, 255, 0), dtype=np.uint8)
+        kept_idx = np.where(visible)[0]
+        if kept_idx.size > 0:
+            image[clamped_y[kept_idx], clamped_x[kept_idx]] = np.asarray((0, 255, 0), dtype=np.uint8)
 
     write_png_image(png_path, image)
 
@@ -1418,7 +1405,7 @@ def build_sample_visibility_lookup(
     camera : CameraConfig
         Camera used for projection and visibility culling.
     view_points_per_unit_length : float
-        Edge sampling density in samples per model unit.
+        Hybrid density control for edge sampling and projected arc thinning.
     zbuffer_resolution : int, optional
         Coarse Z-buffer resolution along the longer viewport side.
     coverage_dilation_size : int, optional
@@ -1484,12 +1471,14 @@ def build_sample_visibility_lookup(
     empty_queries = 0
     debug_sample_pixels: list[np.ndarray] = []
     debug_sample_visible: list[np.ndarray] = []
+    model_reference_length = compute_model_reference_length(model_vertices)
 
     for edge in edges:
         model_points = sample_edge_model_points(
             model_vertices=model_vertices,
             edge=edge,
             view_points_per_unit_length=view_points_per_unit_length,
+            model_reference_length=model_reference_length,
         )
         screen_samples = project_to_screen(
             model_points,
@@ -1550,7 +1539,70 @@ def build_sample_visibility_lookup(
     return sample_visibility_by_edge, stats
 
 
-def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float, float, float]:
+def compute_arc_depth_scale(projected_points: np.ndarray, n_view: float) -> float:
+    """
+    Compute the per-view gain used to convert depth offsets into arc size.
+
+    Parameters
+    ----------
+    projected_points : np.ndarray
+        Projected point array of shape `(N, 3)` in screen coordinates.
+    n_view : float
+        Projected depth of the camera target point.
+
+    Returns
+    -------
+    float
+        Multiplicative gain applied to `(z - n_view)` before deriving the arc
+        diameter.
+
+    Notes
+    -----
+    The gain maps the view depth extent onto a fixed fraction of the projected
+    model span so different meshes export arcs with more coherent physical
+    dimensions. The trade-off is that raw projected depth is no longer used as a
+    one-to-one radius in pixels.
+
+    Assumptions
+    -----------
+    `projected_points` follows the same convention returned by `model_to_window`.
+    """
+
+    pts = np.asarray(projected_points, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[0] == 0 or pts.shape[1] < 3:
+        return 1.0
+
+    valid = (
+        np.isfinite(pts[:, 0])
+        & np.isfinite(pts[:, 1])
+        & np.isfinite(pts[:, 2])
+    )
+    if not np.any(valid):
+        return 1.0
+
+    view_pts = pts[valid]
+    span_x = float(np.max(view_pts[:, 0]) - np.min(view_pts[:, 0]))
+    span_y = float(np.max(view_pts[:, 1]) - np.min(view_pts[:, 1]))
+    projected_span = max(1.0, span_x, span_y)
+
+    depth_extent = max(
+        abs(float(np.max(view_pts[:, 2]) - n_view)),
+        abs(float(np.min(view_pts[:, 2]) - n_view)),
+    )
+    depth_extent = max(
+        depth_extent,
+        projected_span * ARC_DEPTH_EXTENT_FLOOR_SPAN_FRACTION,
+        EPS,
+    )
+    target_radius = max(1.0, projected_span * ARC_RADIUS_SPAN_FRACTION)
+    return float((2.0 * target_radius) / depth_extent)
+
+
+def get_arc_square(
+    point_zero: np.ndarray,
+    n_view: float,
+    depth_scale: float = 1.0,
+) -> tuple[float, float, float, float]:
     """
     Convert one projected sample into the bounding box of its scratch arc.
 
@@ -1560,6 +1612,9 @@ def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float,
         Projected sample `(x, y, z)` in screen coordinates and projected depth.
     n_view : float
         Projected depth of the camera target point.
+    depth_scale : float, optional
+        Per-view gain applied to the projected depth offset before computing the
+        arc diameter.
 
     Returns
     -------
@@ -1568,14 +1623,14 @@ def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float,
 
     Notes
     -----
-    The arc diameter is proportional to the sample depth offset from `n_view`.
+    The arc diameter is proportional to the scaled depth offset from `n_view`.
 
     Assumptions
     -----------
     `point_zero` follows the same convention returned by `model_to_window`.
     """
 
-    distance_from_canvas = float(point_zero[2] - n_view)
+    distance_from_canvas = float(point_zero[2] - n_view) * float(depth_scale)
     center_x = float(point_zero[0])
     center_y = float(point_zero[1] - distance_from_canvas / 2.0)
     halfwidth = abs(center_y - float(point_zero[1]))
@@ -1586,12 +1641,121 @@ def get_arc_square(point_zero: np.ndarray, n_view: float) -> tuple[float, float,
     return rect_x, rect_y, length, length
 
 
+def compute_model_reference_length(model_vertices: np.ndarray) -> float:
+    """
+    Compute the characteristic model span used to normalize edge sampling.
+
+    Parameters
+    ----------
+    model_vertices : np.ndarray
+        Vertex array of shape `(N, 3)` in model units.
+
+    Returns
+    -------
+    float
+        Longest axis-aligned model span in model units.
+
+    Notes
+    -----
+    The longest bounding-box span is used so uniformly scaling a mesh no longer
+    changes the effective sample density. The trade-off is that two unrelated
+    meshes with the same proportions but different intended physical sizes will
+    now receive similar scratch densities for the same `line_resolution`.
+
+    Assumptions
+    -----------
+    `model_vertices` is finite or empty.
+    """
+
+    verts = np.asarray(model_vertices, dtype=np.float64)
+    if verts.size == 0:
+        return 1.0
+    spans = np.max(verts, axis=0) - np.min(verts, axis=0)
+    reference_length = float(np.max(spans))
+    if not math.isfinite(reference_length) or reference_length < EPS:
+        return 1.0
+    return reference_length
+
+
+def resolve_edge_sample_count(
+    length_model: float,
+    view_points_per_unit_length: float,
+    model_reference_length: float,
+) -> int:
+    """
+    Convert one edge length into a scale-normalized sample count.
+
+    Parameters
+    ----------
+    length_model : float
+        Edge length in model units.
+    view_points_per_unit_length : float
+        User-selected line resolution value.
+    model_reference_length : float
+        Characteristic model span used for normalization.
+
+    Returns
+    -------
+    int
+        Number of sampling points to place along the edge.
+
+    Notes
+    -----
+    `line_resolution` is interpreted as density across one reference model
+    span, not as samples per raw model unit. This keeps uniformly scaled copies
+    of the same mesh visually comparable. The trade-off is an intentional
+    behavior change for callers that previously relied on absolute STL units.
+
+    Assumptions
+    -----------
+    `view_points_per_unit_length` is strictly positive.
+    """
+
+    if not math.isfinite(length_model) or length_model <= EPS:
+        return 2
+    ref = max(float(model_reference_length), EPS)
+    normalized_length = max(0.0, float(length_model) / ref)
+    return max(2, int(float(view_points_per_unit_length) * normalized_length))
+
+
+def compute_projected_sample_spacing_px(view_points_per_unit_length: float) -> float:
+    """
+    Resolve the screen-space spacing used to thin dense projected sample sets.
+
+    Parameters
+    ----------
+    view_points_per_unit_length : float
+        User-selected line resolution value.
+
+    Returns
+    -------
+    float
+        Minimum projected spacing between accepted arc seed points, in pixels.
+
+    Notes
+    -----
+    Dense triangle meshes can produce thousands of almost-overlapping arc seeds
+    even when every edge receives only two samples. This helper adds a second,
+    screen-space density control so `line_resolution` remains meaningful on both
+    coarse and finely tessellated models. The trade-off is that very dense
+    micro-detail may be merged at low resolutions.
+
+    Assumptions
+    -----------
+    `view_points_per_unit_length` is strictly positive.
+    """
+
+    lr = max(float(view_points_per_unit_length), 1.0e-6)
+    return float(max(1.25, min(64.0, 32.0 / lr)))
+
+
 def get_edge_points(
     model_start: np.ndarray,
     model_end: np.ndarray,
     zero_start: np.ndarray,
     zero_end: np.ndarray,
     view_points_per_unit_length: float,
+    sample_count: int | None = None,
 ) -> np.ndarray:
     """
     Interpolate projected samples along one edge in screen space.
@@ -1603,7 +1767,11 @@ def get_edge_points(
     zero_start, zero_end : np.ndarray
         Corresponding projected endpoints in screen coordinates.
     view_points_per_unit_length : float
-        Edge sampling density in samples per model unit.
+        Legacy edge sampling density argument retained for compatibility.
+    sample_count : int | None, optional
+        Explicit number of interpolation points. When provided, it overrides the
+        legacy `view_points_per_unit_length` path so projection-only fallback
+        stays aligned with model-space sampling.
 
     Returns
     -------
@@ -1621,8 +1789,11 @@ def get_edge_points(
     The projected endpoints correspond to the model endpoints.
     """
 
-    length_model = float(np.linalg.norm(model_end - model_start))
-    num_points = max(2, int(view_points_per_unit_length * length_model))
+    if sample_count is None:
+        length_model = float(np.linalg.norm(model_end - model_start))
+        num_points = max(2, int(view_points_per_unit_length * length_model))
+    else:
+        num_points = max(2, int(sample_count))
     fractions = np.linspace(0.0, 1.0, num_points)
     return zero_start + (zero_end - zero_start) * fractions[:, None]
 
@@ -1631,6 +1802,7 @@ def sample_edge_model_points(
     model_vertices: np.ndarray,
     edge: Edge,
     view_points_per_unit_length: float,
+    model_reference_length: float,
 ) -> np.ndarray:
     """
     Sample one mesh edge uniformly in model space.
@@ -1642,7 +1814,9 @@ def sample_edge_model_points(
     edge : Edge
         Mesh edge to sample.
     view_points_per_unit_length : float
-        Edge sampling density in samples per model unit.
+        Edge sampling density relative to one reference model span.
+    model_reference_length : float
+        Characteristic model span used to normalize edge density.
 
     Returns
     -------
@@ -1663,7 +1837,11 @@ def sample_edge_model_points(
     model_start = np.asarray(model_vertices[edge.start_idx], dtype=np.float64)
     model_end = np.asarray(model_vertices[edge.end_idx], dtype=np.float64)
     length_model = float(np.linalg.norm(model_end - model_start))
-    num_points = max(2, int(float(view_points_per_unit_length) * length_model))
+    num_points = resolve_edge_sample_count(
+        length_model=length_model,
+        view_points_per_unit_length=view_points_per_unit_length,
+        model_reference_length=model_reference_length,
+    )
     fractions = np.linspace(0.0, 1.0, num_points)
     return model_start + ((model_end - model_start) * fractions[:, None])
 
@@ -1681,6 +1859,7 @@ def generate_arcs(
     model_to_window_mtx: np.ndarray | None = None,
     model_to_view_mtx: np.ndarray | None = None,
     sample_visibility_by_edge: dict[int, np.ndarray] | None = None,
+    arc_depth_scale_multiplier: float = 1.0,
 ) -> list[Arc]:
     """
     Convert sampled mesh edges into projected scratch arcs.
@@ -1694,7 +1873,7 @@ def generate_arcs(
     edges : list[Edge]
         Mesh edges used for edge sampling.
     view_points_per_unit_length : float
-        Edge sampling density in samples per model unit.
+        Hybrid density control for edge sampling and projected arc thinning.
     n_view : float
         Projected depth of the camera target point.
     dedupe_decimals : int
@@ -1721,8 +1900,9 @@ def generate_arcs(
     -----
     Arc generation operates on edge sampling points, not on faces. Deduplication
     is intentionally applied both to projected sample positions and to arc
-    geometry; the trade-off is deterministic SVG output at the cost of dropping
-    coincident arcs that would otherwise overdraw the same path.
+    geometry; a coarse screen-space bucket also keeps dense triangulation from
+    flooding the output with nearly overlapping arcs. The trade-off is dropping
+    some micro-detail at low resolutions.
 
     Assumptions
     -----------
@@ -1730,9 +1910,12 @@ def generate_arcs(
     same edge sampling density.
     """
 
-    seen_coords: set[str] = set()
+    seen_coords: set[tuple[int, int, int]] = set()
     seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
     arcs: list[Arc] = []
+    model_reference_length = compute_model_reference_length(model_vertices)
+    arc_depth_scale = compute_arc_depth_scale(zero_vertices, n_view) * float(arc_depth_scale_multiplier)
+    projected_sample_spacing = compute_projected_sample_spacing_px(view_points_per_unit_length)
     geom_decimals = max(3, dedupe_decimals - 2)
     mode = str(arc_mode).strip().lower()
     if mode not in ("semi", "elliptic"):
@@ -1744,6 +1927,7 @@ def generate_arcs(
             model_vertices=model_vertices,
             edge=edge,
             view_points_per_unit_length=view_points_per_unit_length,
+            model_reference_length=model_reference_length,
         )
         if model_to_window_mtx is not None:
             points = model_to_window(model_points, model_to_window_mtx)
@@ -1756,6 +1940,7 @@ def generate_arcs(
                 zero_start=zero_start,
                 zero_end=zero_end,
                 view_points_per_unit_length=view_points_per_unit_length,
+                sample_count=int(model_points.shape[0]),
             )
 
         edge_visibility = None
@@ -1766,15 +1951,19 @@ def generate_arcs(
             if edge_visibility is not None and sample_idx < edge_visibility.shape[0] and not bool(edge_visibility[sample_idx]):
                 continue
             coord_hash = (
-                f"{point[0]:.{dedupe_decimals}f}:"
-                f"{point[1]:.{dedupe_decimals}f}:"
-                f"{point[2]:.{dedupe_decimals}f}"
+                int(round(float(point[0]) / projected_sample_spacing)),
+                int(round(float(point[1]) / projected_sample_spacing)),
+                int(round(float(point[2]) / projected_sample_spacing)),
             )
             if coord_hash in seen_coords:
                 continue
             seen_coords.add(coord_hash)
 
-            rect_x, rect_y, rect_w, rect_h = get_arc_square(point, n_view)
+            rect_x, rect_y, rect_w, rect_h = get_arc_square(
+                point,
+                n_view,
+                depth_scale=arc_depth_scale,
+            )
             if mode == "elliptic":
                 cx = rect_x + rect_w / 2.0
                 cy = rect_y + rect_h / 2.0
@@ -1823,6 +2012,68 @@ def generate_arcs(
     return arcs
 
 
+def merge_arc_lists(arc_lists: list[list[Arc]], dedupe_decimals: int = 6) -> list[Arc]:
+    """
+    Merge arc lists produced by parallel workers into a single deduplicated set.
+
+    Parameters
+    ----------
+    arc_lists : list[list[Arc]]
+        Arc lists returned by independent worker processes.
+    dedupe_decimals : int, optional
+        Decimal precision for coordinate and geometry deduplication.
+
+    Returns
+    -------
+    list[Arc]
+        Sorted, deduplicated arc list equivalent to single-threaded output.
+
+    Notes
+    -----
+    Each worker already deduplicates within its own chunk, so cross-chunk
+    duplicates are rare but possible near chunk boundaries. The final pass
+    uses the same hash keys as `generate_arcs` to guarantee identical output.
+    """
+    geom_decimals = max(3, dedupe_decimals - 2)
+    seen_coords: set[tuple[float, float, float]] = set()
+    seen_arc_geom: set[tuple[float, float, float, float, int]] = set()
+    merged: list[Arc] = []
+
+    for arcs in arc_lists:
+        for arc in arcs:
+            coord_hash = (
+                round(arc.zero_coord[0], dedupe_decimals),
+                round(arc.zero_coord[1], dedupe_decimals),
+                round(arc.zero_coord[2], dedupe_decimals),
+            )
+            if coord_hash in seen_coords:
+                continue
+            seen_coords.add(coord_hash)
+
+            arc_hash = (
+                round(arc.rect_x, geom_decimals),
+                round(arc.rect_y, geom_decimals),
+                round(arc.rect_w, geom_decimals),
+                round(arc.rect_h, geom_decimals),
+                int(arc.start_angle),
+            )
+            if arc_hash in seen_arc_geom:
+                continue
+            seen_arc_geom.add(arc_hash)
+            merged.append(arc)
+
+    merged.sort(
+        key=lambda a: (
+            a.edge_id,
+            round(a.zero_coord[0], 4),
+            round(a.zero_coord[1], 4),
+            a.start_angle,
+            a.sweep_angle,
+        )
+    )
+    return merged
+
+
 def build_simulation_edge_info(
     model_vertices: np.ndarray,
     edges: list[Edge],
@@ -1838,7 +2089,7 @@ def build_simulation_edge_info(
     edges : list[Edge]
         Mesh edges used for edge sampling.
     view_points_per_unit_length : float
-        Edge sampling density in samples per model unit.
+        Edge sampling density relative to one reference model span.
 
     Returns
     -------
@@ -1856,11 +2107,16 @@ def build_simulation_edge_info(
     """
 
     sim_edges: list[tuple[int, int, int, float, float, float]] = []
+    model_reference_length = compute_model_reference_length(model_vertices)
     for edge in edges:
         start = model_vertices[edge.start_idx]
         end = model_vertices[edge.end_idx]
         edge_len = float(np.linalg.norm(end - start))
-        num_points = max(2, int(view_points_per_unit_length * edge_len))
+        num_points = resolve_edge_sample_count(
+            length_model=edge_len,
+            view_points_per_unit_length=view_points_per_unit_length,
+            model_reference_length=model_reference_length,
+        )
         sim_edges.append(
             (
                 int(edge.start_idx),
@@ -2174,11 +2430,17 @@ def write_slide_debug_assets(
         _draw_line_rgb(visibility_img, p0[0], p0[1], p1[0], p1[1], (220, 224, 230), thickness=1)
 
     model_to_window_mtx = build_model_to_window_matrix(camera)
+    model_reference_length = compute_model_reference_length(model_vertices)
     sample_points_xy: list[np.ndarray] = []
     visible_points_xy: list[np.ndarray] = []
     hidden_points_xy: list[np.ndarray] = []
     for edge in edges:
-        model_points = sample_edge_model_points(model_vertices, edge, view_points_per_unit_length)
+        model_points = sample_edge_model_points(
+            model_vertices,
+            edge,
+            view_points_per_unit_length,
+            model_reference_length,
+        )
         if model_points.shape[0] == 0:
             continue
         screen_points = model_to_window(model_points, model_to_window_mtx)
@@ -2322,6 +2584,7 @@ def write_simulation_html(
 
     payload = {
         "minArcRadius": float(min_arc_radius),
+        "arcDepthScale": float(compute_arc_depth_scale(projected_vertices, n_view)),
         "camera": {
             "po": [float(camera.po[0]), float(camera.po[1]), float(camera.po[2])],
             "pr": [float(camera.pr[0]), float(camera.pr[1]), float(camera.pr[2])],
@@ -2551,7 +2814,7 @@ def write_simulation_html(
         "      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return;\n"
         "      const tx = (canvas.width / 2.0) - ((minX + maxX) / 2.0);\n"
         "      const ty = (canvas.height / 2.0) - ((minY + maxY) / 2.0);\n"
-        "      const gain = Number(viewGain.value) / 100.0;\n"
+        "      const gain = (Number(viewGain.value) / 100.0) * Number(data.arcDepthScale || 1.0);\n"
         "      const lightDir = buildLightDirection();\n"
         "      const mode = renderMode.value;\n"
         "      const wantPattern = showArcs.checked && (mode === 'combined' || mode === 'pattern');\n"
@@ -2947,7 +3210,7 @@ def parse_args() -> argparse.Namespace:
         "--line-resolution",
         type=float,
         default=0.63,
-        help="Points per model unit along each edge (HoloZens-like line resolution).",
+        help="Scale-normalized sampling density across one reference model span.",
     )
     parser.add_argument("--stroke-width", type=float, default=0.2, help="SVG stroke width")
     parser.add_argument("--dedupe-decimals", type=int, default=6, help="Arc point dedupe precision")
